@@ -25,3 +25,4 @@
 
 ## 문서
 - 기획안: [docs/project-plan.md](docs/project-plan.md)
+- DB/API 설계서: [docs/db-api-design.md](docs/db-api-design.md)
