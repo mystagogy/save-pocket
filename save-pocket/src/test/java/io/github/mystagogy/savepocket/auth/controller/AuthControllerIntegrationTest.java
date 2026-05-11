@@ -16,11 +16,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -118,6 +122,23 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.error").doesNotExist());
     }
 
+    // 로그인 후 동일 세션으로 보호 경로 접근 시 401이 아닌 응답(인증 통과)을 반환해야 한다.
+    @Test
+    void protectedEndpointIsNot401AfterLogin() throws Exception {
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("email", "user@example.com", "password", "Password123!")
+        );
+
+        MvcResult loginResult = mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        mockMvc.perform(get("/test/protected").session((org.springframework.mock.web.MockHttpSession) loginResult.getRequest().getSession(false)))
+                .andExpect(status().isOk());
+    }
+
     // 잘못된 비밀번호로 로그인하면 401과 인증 실패 코드를 반환해야 한다.
     @Test
     void loginReturns401WhenPasswordIsInvalid() throws Exception {
@@ -186,5 +207,21 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @TestConfiguration
+    static class TestControllerConfig {
+        @Bean
+        TestProtectedController testProtectedController() {
+            return new TestProtectedController();
+        }
+    }
+
+    @RestController
+    static class TestProtectedController {
+        @GetMapping("/test/protected")
+        String protectedEndpoint() {
+            return "ok";
+        }
     }
 }

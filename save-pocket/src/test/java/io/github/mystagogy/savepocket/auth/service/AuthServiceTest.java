@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +64,7 @@ class AuthServiceTest {
         assertThat(session).isNotNull();
         assertThat(session.getAttribute(AuthSessionConstants.USER_ID)).isEqualTo(1L);
         assertThat(session.getAttribute(AuthSessionConstants.USER_EMAIL)).isEqualTo("user@example.com");
+        assertThat(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNotNull();
     }
 
     // 이메일로 사용자를 찾지 못하면 인증 실패 예외를 던져야 한다.

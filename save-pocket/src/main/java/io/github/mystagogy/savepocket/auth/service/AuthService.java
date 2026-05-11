@@ -10,6 +10,11 @@ import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.util.Collections;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +41,14 @@ public class AuthService {
         servletRequest.changeSessionId();
         session.setAttribute(AuthSessionConstants.USER_ID, user.getId());
         session.setAttribute(AuthSessionConstants.USER_EMAIL, user.getEmail());
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new UsernamePasswordAuthenticationToken(
+                user.getId(),
+                null,
+                Collections.emptyList()
+        ));
+        SecurityContextHolder.setContext(context);
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
         return new AuthUserResponse(user.getId(), user.getEmail(), user.getNickname());
     }
@@ -61,5 +74,6 @@ public class AuthService {
         }
 
         session.invalidate();
+        SecurityContextHolder.clearContext();
     }
 }
