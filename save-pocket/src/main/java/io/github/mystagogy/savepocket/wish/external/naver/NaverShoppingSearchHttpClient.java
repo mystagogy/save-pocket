@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Component
 public class NaverShoppingSearchHttpClient implements NaverShoppingSearchClient {
@@ -33,18 +34,23 @@ public class NaverShoppingSearchHttpClient implements NaverShoppingSearchClient 
             return List.of();
         }
 
-        NaverShopSearchResponse response = restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(properties.shoppingUrl())
-                        .queryParam("query", query)
-                        .queryParam("display", 20)
-                        .queryParam("sort", "sim")
-                        .build())
-                .header(HEADER_CLIENT_ID, properties.clientId())
-                .header(HEADER_CLIENT_SECRET, properties.clientSecret())
-                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .retrieve()
-                .body(NaverShopSearchResponse.class);
+        NaverShopSearchResponse response;
+        try {
+            response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(properties.shoppingUrl())
+                            .queryParam("query", query)
+                            .queryParam("display", 20)
+                            .queryParam("sort", "sim")
+                            .build())
+                    .header(HEADER_CLIENT_ID, properties.clientId())
+                    .header(HEADER_CLIENT_SECRET, properties.clientSecret())
+                    .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                    .retrieve()
+                    .body(NaverShopSearchResponse.class);
+        } catch (RestClientException ex) {
+            return List.of();
+        }
 
         if (response == null || response.items() == null || response.items().isEmpty()) {
             return List.of();

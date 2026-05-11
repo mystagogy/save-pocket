@@ -138,6 +138,17 @@ class WishControllerIntegrationTest {
                 .andExpect(jsonPath("$.data[0].url").value("https://shopping.naver.com/item/1"));
     }
 
+    // 검색어 파라미터 없이 조회하면 400 유효성 검증 실패를 반환해야 한다.
+    @Test
+    void searchWishesReturns400WhenQueryIsMissing() throws Exception {
+        org.springframework.mock.web.MockHttpSession session = loginSession("user1@example.com", "Password123!");
+
+        mockMvc.perform(get("/wishes/search")
+                        .session(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
     // 목록 조회 시 로그인한 사용자 소유의 위시만 반환해야 한다.
     @Test
     void getWishesReturnsOnlyCurrentUsersWishes() throws Exception {

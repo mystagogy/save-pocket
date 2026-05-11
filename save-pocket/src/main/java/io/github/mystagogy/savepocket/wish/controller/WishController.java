@@ -41,7 +41,9 @@ public class WishController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<WishSearchItemResponse>>> searchWishes(@RequestParam String query) {
+    public ResponseEntity<ApiResponse<List<WishSearchItemResponse>>> searchWishes(
+            @RequestParam(required = false) String query
+    ) {
         List<WishSearchItemResponse> response = wishService.searchWishes(query);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
