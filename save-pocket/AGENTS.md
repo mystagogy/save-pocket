@@ -78,3 +78,55 @@
 ## 8) 참고 문서
 - 기획: `docs/project-plan.md`
 - DB/API 설계: `docs/db-api-design.md`
+
+## 9) AI 작업 워크플로우 (Mandatory)
+
+AI must follow this workflow strictly for all feature implementations.
+
+### Step 1. Requirement Analysis
+- Analyze the request before coding.
+- Identify affected domain/service/API/test areas.
+
+### Step 2. Implementation Plan
+Before implementation, explain:
+- implementation strategy
+- files to modify
+- database/schema impact
+- API changes
+- validation/security considerations
+- test strategy
+
+### Step 3. Approval Required
+- NEVER start implementation before explicit user approval.
+- Do not generate code immediately after planning.
+
+### Step 4. Implementation
+- Implement only approved scope.
+- Keep commits logically small and isolated.
+
+### Step 5. Implementation Review
+After implementation, explain:
+- what changed
+- why it changed
+- important design decisions
+- possible side effects
+
+### Step 6. Confirmation Required
+- Wait for user confirmation before writing tests or proceeding.
+
+### Step 7. Testing
+- Add/update:
+    - service tests
+    - integration tests
+- Explain covered scenarios.
+
+### Step 8. Local Verification
+- Ask user to run local verification before commit/push.
+
+### Step 9. Git Workflow
+- Generate commit message after verification.
+- NEVER commit automatically without approval.
+- NEVER push automatically without approval.
+
+### Step 10. Pull Request
+- PR must follow `.github/pull_request_template.md`
