@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public record WishSummaryResponse(
         Long id,
         String name,
+        String imageUrl,
         WishStatus status,
         Long effectivePrice,
         LocalDateTime expireAt
