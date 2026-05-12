@@ -1,6 +1,7 @@
 import {
   ApiEnvelope,
   AuthUserResponse,
+  WishStatus,
   LoginRequest,
   SignupRequest,
   WishCreateRequest,
@@ -8,7 +9,6 @@ import {
   WishDetailResponse,
   WishSearchItemResponse,
   WishStatusUpdateResponse,
-  WishStatus,
   WishSummaryResponse,
 } from "@/lib/types";
 
@@ -129,6 +129,12 @@ export function searchWishProducts(query: string) {
 
 export function purchaseWish(id: number) {
   return request<WishStatusUpdateResponse>(`/wishes/${id}/purchase`, {
+    method: "POST",
+  });
+}
+
+export function reactivateWish(id: number) {
+  return request<WishStatusUpdateResponse>(`/wishes/${id}/reactivate`, {
     method: "POST",
   });
 }

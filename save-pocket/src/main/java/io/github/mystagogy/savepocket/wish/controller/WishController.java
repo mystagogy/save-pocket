@@ -78,4 +78,11 @@ public class WishController {
         WishStatusUpdateResponse response = wishService.deleteWish(userId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    @PostMapping("/{id}/reactivate")
+    public ResponseEntity<ApiResponse<WishStatusUpdateResponse>> reactivateWish(@PathVariable Long id) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        WishStatusUpdateResponse response = wishService.reactivateWish(userId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }
