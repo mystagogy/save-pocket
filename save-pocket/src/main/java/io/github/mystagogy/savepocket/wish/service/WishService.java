@@ -122,6 +122,7 @@ public class WishService {
                 .map(wish -> new WishSummaryResponse(
                         wish.getId(),
                         wish.getProductName(),
+                        wish.getProductImageUrl(),
                         wish.getStatus(),
                         wish.effectivePrice(),
                         wish.getExpireAt()
