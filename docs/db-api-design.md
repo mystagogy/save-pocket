@@ -210,6 +210,7 @@ ON wish_event_history (wish_id, event_at DESC);
   {
     "id": 10,
     "name": "나이키 운동화",
+    "imageUrl": "https://image.example.com/a.jpg",
     "status": "WAITING",
     "effectivePrice": 119000,
     "expireAt": "2026-05-13T23:00:00+09:00"
@@ -296,6 +297,18 @@ ON wish_event_history (wish_id, event_at DESC);
 - `INVALID_STATUS_TRANSITION` (409)
 - `EXTERNAL_API_FAILED` (502)
 - `INTERNAL_SERVER_ERROR` (500)
+
+## 3.6 프론트엔드 연동 메모 (Next.js)
+- 프론트 프로젝트 경로: `my-webapp`
+- UI 주요 경로
+  - `/` : 로그인 메인 화면
+  - `/signup` : 회원가입
+  - `/wishes/search` : 위시 상품 검색
+  - `/wishes` : 위시 리스트
+  - `/wishes/{id}` : 위시 상세
+- 프론트는 `/sp/*` 경로를 백엔드 API로 프록시한다.
+  - 예: `/sp/auth/login` -> `http://localhost:8080/auth/login`
+  - 예: `/sp/wishes` -> `http://localhost:8080/wishes`
 
 ## 4. 스케줄러 설계
 - 만료 판정: `0 */10 * * * *`

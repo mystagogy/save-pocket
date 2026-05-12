@@ -87,13 +87,18 @@
 - 실패 처리: 상품 단위 실패 격리, 전체 배치 중단 방지
 
 ## 10. 기술 스택
-- Java 17
-- Spring Boot
-- Spring Scheduler
-- Spring Data JPA
-- MySQL
-- Thymeleaf
-- Swagger/OpenAPI
+- 백엔드
+  - Java 17
+  - Spring Boot
+  - Spring Scheduler
+  - Spring Data JPA
+  - MySQL
+  - Swagger/OpenAPI
+- 프론트엔드
+  - Next.js 16 (App Router)
+  - React 19
+  - TypeScript
+  - Tailwind CSS 4
 - (확장 후보) Redis, 알림, 소셜 로그인
 
 ## 11. API 초안
