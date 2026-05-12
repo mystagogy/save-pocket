@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiRequestError, createWish } from "@/lib/api";
 import { DealSourceType, WishCreateRequest } from "@/lib/types";
 
@@ -14,6 +13,20 @@ const dealSourceOptions: { value: DealSourceType; label: string }[] = [
 ];
 
 export default function WishCreatePage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
+          <p className="text-sm text-[#4b556d]">입력 화면을 준비 중입니다...</p>
+        </section>
+      }
+    >
+      <WishCreateForm />
+    </Suspense>
+  );
+}
+
+function WishCreateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
@@ -30,10 +43,7 @@ export default function WishCreatePage() {
     dealSourceType: "",
   }));
 
-  const handleChange = (
-    field: keyof typeof form,
-    value: string,
-  ): void => {
+  const handleChange = (field: keyof typeof form, value: string): void => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -43,16 +53,11 @@ export default function WishCreatePage() {
     setError(null);
 
     const referencePrice =
-      form.referencePrice.trim() === ""
-        ? undefined
-        : Number(form.referencePrice);
+      form.referencePrice.trim() === "" ? undefined : Number(form.referencePrice);
     const userDealPrice =
       form.userDealPrice.trim() === "" ? undefined : Number(form.userDealPrice);
 
-    if (
-      Number.isNaN(referencePrice ?? 0) ||
-      Number.isNaN(userDealPrice ?? 0)
-    ) {
+    if (Number.isNaN(referencePrice ?? 0) || Number.isNaN(userDealPrice ?? 0)) {
       setError("가격은 숫자로 입력해주세요.");
       setSubmitting(false);
       return;
@@ -66,8 +71,7 @@ export default function WishCreatePage() {
       referencePrice,
       userDealPrice,
       dealUrl: form.dealUrl || undefined,
-      dealSourceType:
-        (form.dealSourceType as DealSourceType | "") || undefined,
+      dealSourceType: (form.dealSourceType as DealSourceType | "") || undefined,
     };
 
     try {
