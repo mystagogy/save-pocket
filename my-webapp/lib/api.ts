@@ -7,6 +7,7 @@ import {
   WishCreateResponse,
   WishDetailResponse,
   WishSearchItemResponse,
+  WishStatusUpdateResponse,
   WishStatus,
   WishSummaryResponse,
 } from "@/lib/types";
@@ -124,4 +125,16 @@ export function createWish(payload: WishCreateRequest) {
 export function searchWishProducts(query: string) {
   const params = new URLSearchParams({ query });
   return request<WishSearchItemResponse[]>(`/wishes/search?${params.toString()}`);
+}
+
+export function purchaseWish(id: number) {
+  return request<WishStatusUpdateResponse>(`/wishes/${id}/purchase`, {
+    method: "POST",
+  });
+}
+
+export function deleteWish(id: number) {
+  return request<WishStatusUpdateResponse>(`/wishes/${id}/delete`, {
+    method: "POST",
+  });
 }

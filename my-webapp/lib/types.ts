@@ -113,3 +113,8 @@ export interface WishDetailResponse {
   priceHistories: WishPriceHistoryItem[];
   events: WishEventItem[];
 }
+
+export interface WishStatusUpdateResponse {
+  id: number;
+  status: WishStatus;
+}
