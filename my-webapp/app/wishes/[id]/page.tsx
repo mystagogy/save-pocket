@@ -4,7 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiRequestError, deleteWish, getWishDetail, reactivateWish } from "@/lib/api";
+import {
+  ApiRequestError,
+  deleteWish,
+  getWishDetail,
+  purchaseWish,
+  reactivateWish,
+} from "@/lib/api";
 import { formatCurrency, formatDateTime, statusToLabel } from "@/lib/format";
 import { WishDetailResponse } from "@/lib/types";
 
@@ -27,7 +33,9 @@ export default function WishDetailPage() {
   const [detail, setDetail] = useState<WishDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<"reactivate" | "delete" | null>(null);
+  const [actionLoading, setActionLoading] = useState<"purchase" | "reactivate" | "delete" | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   const reloadWishDetail = async () => {
@@ -35,15 +43,17 @@ export default function WishDetailPage() {
     setDetail(response);
   };
 
-  const handleAction = async (action: "reactivate" | "delete") => {
+  const handleAction = async (action: "purchase" | "reactivate" | "delete") => {
     if (!detail) {
       return;
     }
 
     const confirmed = window.confirm(
-      action === "reactivate"
-        ? "이 위시를 보류 상태로 다시 추가할까요?"
-        : "이 위시를 삭제 처리할까요?",
+      action === "purchase"
+        ? "이 상품을 구매 완료로 처리할까요?"
+        : action === "reactivate"
+          ? "이 위시를 보류 상태로 다시 추가할까요?"
+          : "이 위시를 삭제 처리할까요?",
     );
     if (!confirmed) {
       return;
@@ -53,7 +63,9 @@ export default function WishDetailPage() {
     setActionError(null);
 
     try {
-      if (action === "reactivate") {
+      if (action === "purchase") {
+        await purchaseWish(detail.id);
+      } else if (action === "reactivate") {
         await reactivateWish(detail.id);
       } else {
         await deleteWish(detail.id);
@@ -126,8 +138,9 @@ export default function WishDetailPage() {
     );
   }
 
-  const isReactivateDisabled =
-    actionLoading !== null || detail.status === "WAITING" || detail.status === "PURCHASED";
+  const isPurchaseDisabled =
+    actionLoading !== null || detail.status === "PURCHASED" || detail.status === "DELETED";
+  const isReactivateDisabled = actionLoading !== null || detail.status !== "EXPIRED";
   const isDeleteDisabled =
     actionLoading !== null || detail.status === "PURCHASED" || detail.status === "DELETED";
   const safeProductUrl = getSafeExternalUrl(detail.productUrl);
@@ -144,7 +157,7 @@ export default function WishDetailPage() {
             </p>
           </div>
 
-          <div className="grid min-w-[210px] grid-cols-3 gap-2">
+          <div className="grid min-w-[300px] grid-cols-4 gap-2">
             <Link
               href="/wishes"
               className="rounded-lg border border-[#d6dcef] px-3 py-2 text-center text-sm font-medium text-[#39445f] transition hover:bg-[#f5f7fc]"
@@ -153,9 +166,17 @@ export default function WishDetailPage() {
             </Link>
             <button
               type="button"
+              onClick={() => handleAction("purchase")}
+              disabled={isPurchaseDisabled}
+              className="rounded-lg border border-[#9ecfba] px-3 py-2 text-sm font-medium text-[#1b6f4d] transition hover:bg-[#eaf9f2] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {actionLoading === "purchase" ? "구매 처리 중..." : "구매"}
+            </button>
+            <button
+              type="button"
               onClick={() => handleAction("reactivate")}
               disabled={isReactivateDisabled}
-              className="rounded-lg border border-[#9ecfba] px-3 py-2 text-sm font-medium text-[#1b6f4d] transition hover:bg-[#eaf9f2] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-[#93b4ff] px-3 py-2 text-sm font-medium text-[#254ea8] transition hover:bg-[#eaf1ff] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {actionLoading === "reactivate" ? "추가 중..." : "보류"}
             </button>

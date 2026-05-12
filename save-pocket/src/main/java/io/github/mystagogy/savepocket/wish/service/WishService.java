@@ -235,7 +235,7 @@ public class WishService {
     }
 
     private void validateReactivationStatus(WishStatus currentStatus) {
-        if (currentStatus == WishStatus.EXPIRED || currentStatus == WishStatus.DELETED) {
+        if (currentStatus == WishStatus.EXPIRED) {
             return;
         }
 

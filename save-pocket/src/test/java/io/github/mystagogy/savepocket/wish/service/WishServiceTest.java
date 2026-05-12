@@ -274,6 +274,21 @@ class WishServiceTest {
                 .isEqualTo(ErrorCode.INVALID_WISH_STATE);
     }
 
+    // DELETED 상태 위시를 보류 재추가 요청하면 상태 전이 예외를 반환해야 한다.
+    @Test
+    void reactivateWishThrowsWhenWishIsDeleted() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.DELETED);
+        wish.setReactivatedCount(1);
+
+        when(productWishRepository.findByIdAndUser_Id(16L, 1L)).thenReturn(Optional.of(wish));
+
+        assertThatThrownBy(() -> wishService.reactivateWish(1L, 16L))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_WISH_STATE);
+    }
+
     // 만료 시각이 지난 WAITING 위시는 EXPIRED로 전환하고 savedAmount/expiredAt/EXPIRED 이벤트를 기록해야 한다.
     @Test
     void expireDueWishesUpdatesStatusAndCreatesEvent() {

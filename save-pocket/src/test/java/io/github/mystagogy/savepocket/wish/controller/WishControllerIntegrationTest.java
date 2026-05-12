@@ -228,6 +228,18 @@ class WishControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("WAITING"));
     }
 
+    // DELETED 상태 위시를 보류 재추가 요청하면 상태 전이 오류를 반환해야 한다.
+    @Test
+    void reactivateWishReturns400WhenWishIsDeleted() throws Exception {
+        ProductWish wish = saveWish(user1, "삭제된 상품", WishStatus.DELETED);
+        org.springframework.mock.web.MockHttpSession session = loginSession("user1@example.com", "Password123!");
+
+        mockMvc.perform(post("/wishes/{id}/reactivate", wish.getId())
+                        .session(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_WISH_STATE"));
+    }
+
     private org.springframework.mock.web.MockHttpSession loginSession(String email, String password) throws Exception {
         String loginRequest = objectMapper.writeValueAsString(Map.of("email", email, "password", password));
 
