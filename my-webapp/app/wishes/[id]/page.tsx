@@ -8,6 +8,18 @@ import { ApiRequestError, deleteWish, getWishDetail, purchaseWish } from "@/lib/
 import { formatCurrency, formatDateTime, statusToLabel } from "@/lib/format";
 import { WishDetailResponse } from "@/lib/types";
 
+function getSafeExternalUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export default function WishDetailPage() {
   const params = useParams<{ id: string }>();
   const wishId = Number(params.id);
@@ -116,6 +128,7 @@ export default function WishDetailPage() {
 
   const isActionDisabled =
     actionLoading !== null || detail.status === "PURCHASED" || detail.status === "DELETED";
+  const safeProductUrl = getSafeExternalUrl(detail.productUrl);
 
   return (
     <div className="space-y-4">
@@ -178,14 +191,16 @@ export default function WishDetailPage() {
             <dd className="mt-1 break-all font-medium text-[#1d2433]">
               {detail.productUrl}
             </dd>
-            <a
-              href={detail.productUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center rounded-lg border border-[#cfd8ee] bg-white px-3 py-1.5 text-xs font-semibold text-[#2c426f] transition hover:bg-[#eef3ff]"
-            >
-              사이트로 이동
-            </a>
+            {safeProductUrl && (
+              <a
+                href={safeProductUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center rounded-lg border border-[#cfd8ee] bg-white px-3 py-1.5 text-xs font-semibold text-[#2c426f] transition hover:bg-[#eef3ff]"
+              >
+                사이트로 이동
+              </a>
+            )}
           </div>
           <div className="rounded-xl bg-[#f6f8ff] px-4 py-3">
             <dt>메모</dt>
