@@ -6,6 +6,7 @@ import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishDetailResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSearchItemResponse;
+import io.github.mystagogy.savepocket.wish.dto.WishStatusUpdateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.service.WishService;
@@ -61,6 +62,20 @@ public class WishController {
     public ResponseEntity<ApiResponse<WishDetailResponse>> getWishDetail(@PathVariable Long id) {
         Long userId = currentUserProvider.getCurrentUserId();
         WishDetailResponse response = wishService.getWishDetail(userId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/purchase")
+    public ResponseEntity<ApiResponse<WishStatusUpdateResponse>> purchaseWish(@PathVariable Long id) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        WishStatusUpdateResponse response = wishService.purchaseWish(userId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<WishStatusUpdateResponse>> deleteWish(@PathVariable Long id) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        WishStatusUpdateResponse response = wishService.deleteWish(userId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

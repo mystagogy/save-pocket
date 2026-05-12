@@ -10,6 +10,7 @@ import io.github.mystagogy.savepocket.wish.dto.WishDetailResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishEventItem;
 import io.github.mystagogy.savepocket.wish.dto.WishPriceHistoryItem;
 import io.github.mystagogy.savepocket.wish.dto.WishSearchItemResponse;
+import io.github.mystagogy.savepocket.wish.dto.WishStatusUpdateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingProduct;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingSearchClient;
@@ -132,13 +133,7 @@ public class WishService {
 
     @Transactional(readOnly = true)
     public WishDetailResponse getWishDetail(Long userId, Long wishId) {
-        ProductWish wish = productWishRepository.findByIdAndUser_Id(wishId, userId)
-                .orElseThrow(() -> {
-                    if (productWishRepository.existsById(wishId)) {
-                        return new SavePocketException(ErrorCode.FORBIDDEN_RESOURCE);
-                    }
-                    return new SavePocketException(ErrorCode.WISH_NOT_FOUND);
-                });
+        ProductWish wish = getAccessibleWish(userId, wishId);
 
         List<WishPriceHistoryItem> priceHistories = priceHistoryRepository.findTop20ByWishIdOrderByChangedAtDesc(wishId).stream()
                 .map(this::toPriceHistoryItem)
@@ -164,6 +159,53 @@ public class WishService {
                 priceHistories,
                 events
         );
+    }
+
+    @Transactional
+    public WishStatusUpdateResponse purchaseWish(Long userId, Long wishId) {
+        ProductWish wish = getAccessibleWish(userId, wishId);
+        validateStatusTransition(wish.getStatus(), WishStatus.PURCHASED);
+        wish.setStatus(WishStatus.PURCHASED);
+        appendEvent(wish, WishEventType.PURCHASED, LocalDateTime.now());
+        return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
+    }
+
+    @Transactional
+    public WishStatusUpdateResponse deleteWish(Long userId, Long wishId) {
+        ProductWish wish = getAccessibleWish(userId, wishId);
+        validateStatusTransition(wish.getStatus(), WishStatus.DELETED);
+        wish.setStatus(WishStatus.DELETED);
+        appendEvent(wish, WishEventType.DELETED, LocalDateTime.now());
+        return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
+    }
+
+    private ProductWish getAccessibleWish(Long userId, Long wishId) {
+        return productWishRepository.findByIdAndUser_Id(wishId, userId)
+                .orElseThrow(() -> {
+                    if (productWishRepository.existsById(wishId)) {
+                        return new SavePocketException(ErrorCode.FORBIDDEN_RESOURCE);
+                    }
+                    return new SavePocketException(ErrorCode.WISH_NOT_FOUND);
+                });
+    }
+
+    private void validateStatusTransition(WishStatus currentStatus, WishStatus nextStatus) {
+        boolean allowed = (currentStatus == WishStatus.WAITING || currentStatus == WishStatus.EXPIRED)
+                && (nextStatus == WishStatus.PURCHASED || nextStatus == WishStatus.DELETED);
+        if (!allowed) {
+            throw new SavePocketException(
+                    ErrorCode.INVALID_WISH_STATE,
+                    "현재 상태(" + currentStatus + ")에서는 " + nextStatus + " 처리할 수 없습니다."
+            );
+        }
+    }
+
+    private void appendEvent(ProductWish wish, WishEventType eventType, LocalDateTime eventAt) {
+        WishEventHistory event = new WishEventHistory();
+        event.setWish(wish);
+        event.setEventType(eventType);
+        event.setEventAt(eventAt);
+        wishEventHistoryRepository.save(event);
     }
 
     private WishPriceHistoryItem toPriceHistoryItem(PriceHistory priceHistory) {

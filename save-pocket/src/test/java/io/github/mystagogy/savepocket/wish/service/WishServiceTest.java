@@ -13,6 +13,7 @@ import io.github.mystagogy.savepocket.common.exception.SavePocketException;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSearchItemResponse;
+import io.github.mystagogy.savepocket.wish.dto.WishStatusUpdateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.entity.DealSourceType;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
@@ -171,6 +172,60 @@ class WishServiceTest {
         assertThat(responses.get(0).id()).isEqualTo(3L);
         assertThat(responses.get(0).name()).isEqualTo("아이패드");
         assertThat(responses.get(0).status()).isEqualTo(WishStatus.WAITING);
+    }
+
+    // WAITING 상태 위시를 구매 처리하면 PURCHASED로 전환되고 이벤트가 기록되어야 한다.
+    @Test
+    void purchaseWishChangesStatusAndCreatesEvent() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        ReflectionTestUtils.setField(wish, "id", 5L);
+
+        when(productWishRepository.findByIdAndUser_Id(5L, 1L)).thenReturn(Optional.of(wish));
+
+        WishStatusUpdateResponse response = wishService.purchaseWish(1L, 5L);
+
+        assertThat(response.id()).isEqualTo(5L);
+        assertThat(response.status()).isEqualTo(WishStatus.PURCHASED);
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.PURCHASED);
+
+        ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
+        verify(wishEventHistoryRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.PURCHASED);
+    }
+
+    // 이미 구매 완료된 위시에 구매 요청하면 상태 전이 예외를 반환해야 한다.
+    @Test
+    void purchaseWishThrowsWhenStatusTransitionIsInvalid() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.PURCHASED);
+
+        when(productWishRepository.findByIdAndUser_Id(5L, 1L)).thenReturn(Optional.of(wish));
+
+        assertThatThrownBy(() -> wishService.purchaseWish(1L, 5L))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_WISH_STATE);
+    }
+
+    // EXPIRED 상태 위시를 삭제 처리하면 DELETED로 전환되고 이벤트가 기록되어야 한다.
+    @Test
+    void deleteWishChangesStatusAndCreatesEvent() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.EXPIRED);
+        ReflectionTestUtils.setField(wish, "id", 8L);
+
+        when(productWishRepository.findByIdAndUser_Id(8L, 1L)).thenReturn(Optional.of(wish));
+
+        WishStatusUpdateResponse response = wishService.deleteWish(1L, 8L);
+
+        assertThat(response.id()).isEqualTo(8L);
+        assertThat(response.status()).isEqualTo(WishStatus.DELETED);
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.DELETED);
+
+        ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
+        verify(wishEventHistoryRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.DELETED);
     }
 
     private User createUser(Long id, String email) {

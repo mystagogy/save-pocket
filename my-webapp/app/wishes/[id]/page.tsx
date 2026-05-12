@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiRequestError, getWishDetail } from "@/lib/api";
+import { ApiRequestError, deleteWish, getWishDetail, purchaseWish } from "@/lib/api";
 import { formatCurrency, formatDateTime, statusToLabel } from "@/lib/format";
 import { WishDetailResponse } from "@/lib/types";
 
@@ -15,9 +15,47 @@ export default function WishDetailPage() {
   const [detail, setDetail] = useState<WishDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<"purchase" | "delete" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleNotReadyAction = (actionName: "구매" | "삭제") => {
-    window.alert(`${actionName} 기능은 백엔드 API 연결 후 활성화됩니다.`);
+  const reloadWishDetail = async () => {
+    const response = await getWishDetail(wishId);
+    setDetail(response);
+  };
+
+  const handleAction = async (action: "purchase" | "delete") => {
+    if (!detail) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      action === "purchase"
+        ? "이 상품을 구매 완료로 처리할까요?"
+        : "이 위시를 삭제 처리할까요?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setActionLoading(action);
+    setActionError(null);
+
+    try {
+      if (action === "purchase") {
+        await purchaseWish(detail.id);
+      } else {
+        await deleteWish(detail.id);
+      }
+      await reloadWishDetail();
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        setActionError(err.message);
+        return;
+      }
+      setActionError("요청 처리 중 오류가 발생했습니다.");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   useEffect(() => {
@@ -76,6 +114,9 @@ export default function WishDetailPage() {
     );
   }
 
+  const isActionDisabled =
+    actionLoading !== null || detail.status === "PURCHASED" || detail.status === "DELETED";
+
   return (
     <div className="space-y-4">
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
@@ -97,20 +138,27 @@ export default function WishDetailPage() {
             </Link>
             <button
               type="button"
-              onClick={() => handleNotReadyAction("구매")}
-              className="rounded-lg border border-[#9ecfba] px-3 py-2 text-sm font-medium text-[#1b6f4d] transition hover:bg-[#eaf9f2]"
+              onClick={() => handleAction("purchase")}
+              disabled={isActionDisabled}
+              className="rounded-lg border border-[#9ecfba] px-3 py-2 text-sm font-medium text-[#1b6f4d] transition hover:bg-[#eaf9f2] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              구매
+              {actionLoading === "purchase" ? "구매 처리 중..." : "구매"}
             </button>
             <button
               type="button"
-              onClick={() => handleNotReadyAction("삭제")}
-              className="rounded-lg border border-[#f2b8bf] px-3 py-2 text-sm font-medium text-[#a03141] transition hover:bg-[#fff1f3]"
+              onClick={() => handleAction("delete")}
+              disabled={isActionDisabled}
+              className="rounded-lg border border-[#f2b8bf] px-3 py-2 text-sm font-medium text-[#a03141] transition hover:bg-[#fff1f3] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              삭제
+              {actionLoading === "delete" ? "삭제 처리 중..." : "삭제"}
             </button>
           </div>
         </div>
+        {actionError && (
+          <p className="mt-3 rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">
+            {actionError}
+          </p>
+        )}
 
         {detail.imageUrl && (
           <div className="mt-5 overflow-hidden rounded-2xl border border-[#e3e8f4]">
@@ -130,6 +178,14 @@ export default function WishDetailPage() {
             <dd className="mt-1 break-all font-medium text-[#1d2433]">
               {detail.productUrl}
             </dd>
+            <a
+              href={detail.productUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center rounded-lg border border-[#cfd8ee] bg-white px-3 py-1.5 text-xs font-semibold text-[#2c426f] transition hover:bg-[#eef3ff]"
+            >
+              사이트로 이동
+            </a>
           </div>
           <div className="rounded-xl bg-[#f6f8ff] px-4 py-3">
             <dt>메모</dt>
