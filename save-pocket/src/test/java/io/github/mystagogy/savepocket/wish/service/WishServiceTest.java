@@ -3,6 +3,9 @@ package io.github.mystagogy.savepocket.wish.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -226,6 +229,118 @@ class WishServiceTest {
         ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.DELETED);
+    }
+
+    // EXPIRED 상태 위시를 보류 재추가하면 WAITING으로 복귀하고 재활성화 정보가 갱신되어야 한다.
+    @Test
+    void reactivateWishRestoresWaitingStateAndUpdatesReactivationFields() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.EXPIRED);
+        wish.setReactivatedCount(2);
+        wish.setExpireAt(LocalDateTime.now().minusHours(1));
+        wish.setExpiredAt(LocalDateTime.now().minusMinutes(30));
+        wish.setSavedAmount(10000L);
+        ReflectionTestUtils.setField(wish, "id", 13L);
+
+        when(productWishRepository.findByIdAndUser_Id(13L, 1L)).thenReturn(Optional.of(wish));
+
+        WishStatusUpdateResponse response = wishService.reactivateWish(1L, 13L);
+
+        assertThat(response.id()).isEqualTo(13L);
+        assertThat(response.status()).isEqualTo(WishStatus.WAITING);
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.WAITING);
+        assertThat(wish.getReactivatedCount()).isEqualTo(3);
+        assertThat(wish.getExpireAt()).isAfter(LocalDateTime.now().plusHours(71));
+        assertThat(wish.getExpiredAt()).isNull();
+        assertThat(wish.getSavedAmount()).isNull();
+
+        ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
+        verify(wishEventHistoryRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.REACTIVATED);
+    }
+
+    // WAITING 상태 위시를 보류 재추가 요청하면 상태 전이 예외를 반환해야 한다.
+    @Test
+    void reactivateWishThrowsWhenStatusTransitionIsInvalid() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setReactivatedCount(0);
+
+        when(productWishRepository.findByIdAndUser_Id(15L, 1L)).thenReturn(Optional.of(wish));
+
+        assertThatThrownBy(() -> wishService.reactivateWish(1L, 15L))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_WISH_STATE);
+    }
+
+    // DELETED 상태 위시를 보류 재추가 요청하면 상태 전이 예외를 반환해야 한다.
+    @Test
+    void reactivateWishThrowsWhenWishIsDeleted() {
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.DELETED);
+        wish.setReactivatedCount(1);
+
+        when(productWishRepository.findByIdAndUser_Id(16L, 1L)).thenReturn(Optional.of(wish));
+
+        assertThatThrownBy(() -> wishService.reactivateWish(1L, 16L))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_WISH_STATE);
+    }
+
+    // 만료 시각이 지난 WAITING 위시는 EXPIRED로 전환하고 savedAmount/expiredAt/EXPIRED 이벤트를 기록해야 한다.
+    @Test
+    void expireDueWishesUpdatesStatusAndCreatesEvent() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 12, 18, 0);
+
+        ProductWish wishWithDealPrice = new ProductWish();
+        wishWithDealPrice.setStatus(WishStatus.WAITING);
+        wishWithDealPrice.setReferencePrice(120000L);
+        wishWithDealPrice.setUserDealPrice(110000L);
+        ReflectionTestUtils.setField(wishWithDealPrice, "id", 21L);
+
+        ProductWish wishWithReferencePrice = new ProductWish();
+        wishWithReferencePrice.setStatus(WishStatus.WAITING);
+        wishWithReferencePrice.setReferencePrice(90000L);
+        ReflectionTestUtils.setField(wishWithReferencePrice, "id", 22L);
+
+        when(productWishRepository.findByStatusAndExpireAtLessThanEqual(WishStatus.WAITING, targetTime))
+                .thenReturn(List.of(wishWithDealPrice, wishWithReferencePrice));
+
+        int expiredCount = wishService.expireDueWishes(targetTime);
+
+        assertThat(expiredCount).isEqualTo(2);
+
+        assertThat(wishWithDealPrice.getStatus()).isEqualTo(WishStatus.EXPIRED);
+        assertThat(wishWithDealPrice.getExpiredAt()).isEqualTo(targetTime);
+        assertThat(wishWithDealPrice.getSavedAmount()).isEqualTo(110000L);
+
+        assertThat(wishWithReferencePrice.getStatus()).isEqualTo(WishStatus.EXPIRED);
+        assertThat(wishWithReferencePrice.getExpiredAt()).isEqualTo(targetTime);
+        assertThat(wishWithReferencePrice.getSavedAmount()).isEqualTo(90000L);
+
+        ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
+        verify(wishEventHistoryRepository, times(2)).save(eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues())
+                .allSatisfy(event -> {
+                    assertThat(event.getEventType()).isEqualTo(WishEventType.EXPIRED);
+                    assertThat(event.getEventAt()).isEqualTo(targetTime);
+                });
+    }
+
+    // 만료 대상이 없으면 상태 변경과 이벤트 저장 없이 0을 반환해야 한다.
+    @Test
+    void expireDueWishesReturnsZeroWhenNoTargetExists() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 12, 18, 0);
+        when(productWishRepository.findByStatusAndExpireAtLessThanEqual(WishStatus.WAITING, targetTime))
+                .thenReturn(List.of());
+
+        int expiredCount = wishService.expireDueWishes(targetTime);
+
+        assertThat(expiredCount).isZero();
+        verify(wishEventHistoryRepository, never()).save(any(WishEventHistory.class));
+        verify(productWishRepository).findByStatusAndExpireAtLessThanEqual(eq(WishStatus.WAITING), eq(targetTime));
     }
 
     private User createUser(Long id, String email) {

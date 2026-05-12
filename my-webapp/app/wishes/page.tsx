@@ -20,7 +20,7 @@ const filters: { value: WishFilter; label: string }[] = [
 
 export default function WishListPage() {
   const router = useRouter();
-  const [filter, setFilter] = useState<WishFilter>("ALL");
+  const [filter, setFilter] = useState<WishFilter>("WAITING");
   const [items, setItems] = useState<WishSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

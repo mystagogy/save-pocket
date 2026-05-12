@@ -179,6 +179,40 @@ public class WishService {
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
 
+    @Transactional
+    public WishStatusUpdateResponse reactivateWish(Long userId, Long wishId) {
+        ProductWish wish = getAccessibleWish(userId, wishId);
+        validateReactivationStatus(wish.getStatus());
+
+        LocalDateTime now = LocalDateTime.now();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setLastViewedAt(now);
+        wish.setExpireAt(now.plusHours(EXPIRE_HOURS));
+        wish.setExpiredAt(null);
+        wish.setSavedAmount(null);
+        wish.setReactivatedCount(wish.getReactivatedCount() + 1);
+        appendEvent(wish, WishEventType.REACTIVATED, now);
+
+        return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
+    }
+
+    @Transactional
+    public int expireDueWishes(LocalDateTime targetTime) {
+        List<ProductWish> dueWishes = productWishRepository.findByStatusAndExpireAtLessThanEqual(
+                WishStatus.WAITING,
+                targetTime
+        );
+
+        for (ProductWish wish : dueWishes) {
+            wish.setStatus(WishStatus.EXPIRED);
+            wish.setExpiredAt(targetTime);
+            wish.setSavedAmount(wish.effectivePrice());
+            appendEvent(wish, WishEventType.EXPIRED, targetTime);
+        }
+
+        return dueWishes.size();
+    }
+
     private ProductWish getAccessibleWish(Long userId, Long wishId) {
         return productWishRepository.findByIdAndUser_Id(wishId, userId)
                 .orElseThrow(() -> {
@@ -198,6 +232,17 @@ public class WishService {
                     "현재 상태(" + currentStatus + ")에서는 " + nextStatus + " 처리할 수 없습니다."
             );
         }
+    }
+
+    private void validateReactivationStatus(WishStatus currentStatus) {
+        if (currentStatus == WishStatus.EXPIRED) {
+            return;
+        }
+
+        throw new SavePocketException(
+                ErrorCode.INVALID_WISH_STATE,
+                "현재 상태(" + currentStatus + ")에서는 WAITING 처리할 수 없습니다."
+        );
     }
 
     private void appendEvent(ProductWish wish, WishEventType eventType, LocalDateTime eventAt) {
