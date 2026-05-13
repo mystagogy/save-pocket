@@ -161,31 +161,41 @@ export default function MonthlyReportPage() {
                     const isPositive = item.signedAmount > 0;
                     const amountClass = isPositive ? "text-[#dc2626]" : "text-[#2563eb]";
                     const canNavigateWishDetail = item.wishId > 0;
-                    const RowTag = canNavigateWishDetail ? Link : "div";
-                    const rowProps = canNavigateWishDetail
-                      ? {
-                          href: `/wishes/${item.wishId}`,
-                          className:
-                            "flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-[#f8fbff]",
-                        }
-                      : { className: "flex items-center justify-between gap-4 px-4 py-3" };
                     return (
                       <li
                         key={`${item.status}-${item.wishId}-${item.occurredAt}-${index}`}
                         className={canNavigateWishDetail ? "cursor-pointer" : ""}
                       >
-                        <RowTag {...rowProps}>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-[#1f2a44]">{item.wishName}</p>
-                            <p className="mt-0.5 text-xs text-[#6b7280]">
-                              {item.status === "EXPIRED" ? "만료(+)" : "구매(-)"} ·{" "}
-                              {formatDateTime(item.occurredAt)}
+                        {canNavigateWishDetail ? (
+                          <Link
+                            href={`/wishes/${item.wishId}`}
+                            className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-[#f8fbff]"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-[#1f2a44]">{item.wishName}</p>
+                              <p className="mt-0.5 text-xs text-[#6b7280]">
+                                {item.status === "EXPIRED" ? "만료(+)" : "구매(-)"} ·{" "}
+                                {formatDateTime(item.occurredAt)}
+                              </p>
+                            </div>
+                            <p className={`shrink-0 text-sm font-semibold ${amountClass}`}>
+                              {formatSignedCurrency(item.signedAmount)}
+                            </p>
+                          </Link>
+                        ) : (
+                          <div className="flex items-center justify-between gap-4 px-4 py-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-[#1f2a44]">{item.wishName}</p>
+                              <p className="mt-0.5 text-xs text-[#6b7280]">
+                                {item.status === "EXPIRED" ? "만료(+)" : "구매(-)"} ·{" "}
+                                {formatDateTime(item.occurredAt)}
+                              </p>
+                            </div>
+                            <p className={`shrink-0 text-sm font-semibold ${amountClass}`}>
+                              {formatSignedCurrency(item.signedAmount)}
                             </p>
                           </div>
-                          <p className={`shrink-0 text-sm font-semibold ${amountClass}`}>
-                            {formatSignedCurrency(item.signedAmount)}
-                          </p>
-                        </RowTag>
+                        )}
                       </li>
                     );
                   })}

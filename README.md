@@ -25,6 +25,7 @@
   - Spring Boot
   - Spring Data JPA
   - MySQL
+  - Redis (세션 저장소)
   - Swagger/OpenAPI
 - 프론트엔드
   - Next.js 16 (App Router)
@@ -36,12 +37,15 @@
 ### 1) 백엔드 실행 (`save-pocket`)
 ```bash
 cd save-pocket
+docker compose up -d
 ./gradlew bootRun
 ```
 
 필수 환경변수(예시):
 - `DB_USERNAME`
 - `DB_PASSWORD`
+- `REDIS_HOST`
+- `REDIS_PORT`
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 

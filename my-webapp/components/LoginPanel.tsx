@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ApiRequestError, login } from "@/lib/api";
 
 export default function LoginPanel() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reason = searchParams.get("reason");
+  const redirectParam = searchParams.get("redirect");
+  const redirectTarget = sanitizeRedirectPath(redirectParam);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -19,7 +23,7 @@ export default function LoginPanel() {
 
     try {
       await login({ email, password });
-      router.push("/");
+      router.push(redirectTarget);
       router.refresh();
     } catch (err) {
       if (err instanceof ApiRequestError) {
@@ -63,6 +67,16 @@ export default function LoginPanel() {
         </div>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          {reason === "expired" && (
+            <p className="rounded-xl bg-[#fff5d6] px-3 py-2 text-sm text-[#7a4a00]">
+              세션이 만료되었습니다. 다시 로그인해주세요.
+            </p>
+          )}
+          {reason === "required" && (
+            <p className="rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#1f2a44]">
+              로그인이 필요한 페이지입니다. 로그인 후 이용해주세요.
+            </p>
+          )}
           <label className="block">
             <span className="mb-1 block text-sm font-medium">이메일</span>
             <input
@@ -112,4 +126,11 @@ export default function LoginPanel() {
       </section>
     </main>
   );
+}
+
+function sanitizeRedirectPath(path: string | null): string {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return "/";
+  }
+  return path;
 }
