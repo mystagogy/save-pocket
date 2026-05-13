@@ -14,6 +14,8 @@ import {
 } from "@/lib/types";
 
 const API_PREFIX = "/sp";
+let redirectingToLogin = false;
+const LOGIN_HINT_KEY = "sp_has_logged_in";
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -60,6 +62,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   const envelope = await parseEnvelope<T>(response);
+  const unauthorized =
+    response.status === 401 || envelope?.error?.code === "UNAUTHORIZED";
+  if (unauthorized && !path.startsWith("/auth/")) {
+    handleUnauthorizedRedirect();
+  }
 
   if (!response.ok) {
     if (envelope?.error) {
@@ -87,6 +94,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return envelope.data;
 }
 
+function handleUnauthorizedRedirect() {
+  if (typeof window === "undefined" || redirectingToLogin) {
+    return;
+  }
+
+  const hasLoginHint = readLoginHint();
+  redirectingToLogin = true;
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  const params = new URLSearchParams({
+    reason: hasLoginHint ? "expired" : "required",
+    redirect: currentPath,
+  });
+
+  if (hasLoginHint) {
+    window.alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+  }
+  window.location.href = `/login?${params.toString()}`;
+}
+
 export function signup(payload: SignupRequest) {
   return request<AuthUserResponse>("/auth/signup", {
     method: "POST",
@@ -98,12 +124,17 @@ export function login(payload: LoginRequest) {
   return request<AuthUserResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
+  }).then((response) => {
+    writeLoginHint();
+    return response;
   });
 }
 
 export function logout() {
   return request<void>("/auth/logout", {
     method: "POST",
+  }).finally(() => {
+    clearLoginHint();
   });
 }
 
@@ -148,4 +179,37 @@ export function deleteWish(id: number) {
 
 export function getMonthlySavings() {
   return request<MonthlySavingsResponse>("/reports/monthly");
+}
+
+function writeLoginHint() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(LOGIN_HINT_KEY, "1");
+  } catch {
+    // localStorage is optional for this UX signal.
+  }
+}
+
+function readLoginHint(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(LOGIN_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function clearLoginHint() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(LOGIN_HINT_KEY);
+  } catch {
+    // localStorage is optional for this UX signal.
+  }
 }
