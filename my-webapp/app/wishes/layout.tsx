@@ -21,9 +21,30 @@ export default function WishesLayout({
               <p className="text-xs font-semibold tracking-wide text-[#1d4ed8]">
                 SAVE-POCKET
               </p>
-              <h1 className="mt-1 text-2xl font-bold">위시 관리</h1>
+              <h1 className="mt-1 text-2xl font-bold">작심삼일 긴축재정</h1>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link
+                href="/"
+                aria-label="메인 화면으로 이동"
+                title="메인 화면"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 10.5L12 4L20 10.5V19C20 19.55 19.55 20 19 20H5C4.45 20 4 19.55 4 19V10.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <path d="M9 20V13H15V20" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
+              </Link>
               <Link
                 href="/wishes/search"
                 className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
@@ -35,12 +56,6 @@ export default function WishesLayout({
                 className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
               >
                 위시 리스트
-              </Link>
-              <Link
-                href="/wishes/new"
-                className="rounded-lg bg-[#1d4ed8] px-3 py-2 text-sm font-medium text-white"
-              >
-                수동 등록
               </Link>
             </div>
           </div>

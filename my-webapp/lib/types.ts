@@ -118,3 +118,20 @@ export interface WishStatusUpdateResponse {
   id: number;
   status: WishStatus;
 }
+
+export interface MonthlySavingsResponse {
+  year: number;
+  month: number;
+  expiredAmount: number;
+  purchasedAmount: number;
+  netSavedAmount: number;
+  details: MonthlySavingsDetailItem[];
+}
+
+export interface MonthlySavingsDetailItem {
+  wishId: number;
+  wishName: string;
+  status: "EXPIRED" | "PURCHASED";
+  occurredAt: string;
+  signedAmount: number;
+}

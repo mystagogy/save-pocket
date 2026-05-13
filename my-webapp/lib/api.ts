@@ -10,6 +10,7 @@ import {
   WishSearchItemResponse,
   WishStatusUpdateResponse,
   WishSummaryResponse,
+  MonthlySavingsResponse,
 } from "@/lib/types";
 
 const API_PREFIX = "/sp";
@@ -143,4 +144,8 @@ export function deleteWish(id: number) {
   return request<WishStatusUpdateResponse>(`/wishes/${id}/delete`, {
     method: "POST",
   });
+}
+
+export function getMonthlySavings() {
+  return request<MonthlySavingsResponse>("/reports/monthly");
 }
