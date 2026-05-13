@@ -23,12 +23,26 @@ services:
     image: redis:7.2-alpine
     container_name: save-pocket-redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$${REDIS_PASSWORD}" ]; then
+          exec redis-server --requirepass "$${REDIS_PASSWORD}"
+        fi
+        exec redis-server
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
