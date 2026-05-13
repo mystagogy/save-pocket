@@ -72,7 +72,15 @@ export default function WishSearchPage() {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
-        <h2 className="text-xl font-semibold">위시 상품 검색</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">위시 상품 검색</h2>
+          <Link
+            href="/wishes/new"
+            className="min-w-20 whitespace-nowrap rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-center text-sm font-semibold !text-white transition hover:bg-[#173da9] hover:!text-white visited:!text-white"
+          >
+            수동 등록
+          </Link>
+        </div>
 
         <form onSubmit={handleSearch} className="mt-5 flex flex-col gap-3 sm:flex-row">
           <input
@@ -96,6 +104,8 @@ export default function WishSearchPage() {
             {error}
           </p>
         )}
+
+        <div className="mt-4 border-t border-[#e5eaf4] pt-4" />
       </section>
 
       {items.length > 0 && (

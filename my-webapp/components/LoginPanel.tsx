@@ -19,7 +19,7 @@ export default function LoginPanel() {
 
     try {
       await login({ email, password });
-      router.push("/wishes/search");
+      router.push("/");
       router.refresh();
     } catch (err) {
       if (err instanceof ApiRequestError) {
