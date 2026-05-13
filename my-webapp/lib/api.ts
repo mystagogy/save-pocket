@@ -17,6 +17,10 @@ const API_PREFIX = "/sp";
 let redirectingToLogin = false;
 const LOGIN_HINT_KEY = "sp_has_logged_in";
 
+interface ApiRequestInit extends RequestInit {
+  redirectOnUnauthorized?: boolean;
+}
+
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -42,16 +46,17 @@ async function parseEnvelope<T>(response: Response): Promise<ApiEnvelope<T> | nu
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
+async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
+  const { redirectOnUnauthorized = true, ...fetchInit } = init;
+  const headers = new Headers(fetchInit.headers);
   headers.set("Accept", "application/json");
 
-  if (init.body && !(init.body instanceof FormData)) {
+  if (fetchInit.body && !(fetchInit.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${API_PREFIX}${path}`, {
-    ...init,
+    ...fetchInit,
     headers,
     credentials: "include",
     cache: "no-store",
@@ -64,7 +69,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const envelope = await parseEnvelope<T>(response);
   const unauthorized =
     response.status === 401 || envelope?.error?.code === "UNAUTHORIZED";
-  if (unauthorized && !path.startsWith("/auth/")) {
+  if (unauthorized && redirectOnUnauthorized && !path.startsWith("/auth/")) {
     handleUnauthorizedRedirect();
   }
 
@@ -177,8 +182,8 @@ export function deleteWish(id: number) {
   });
 }
 
-export function getMonthlySavings() {
-  return request<MonthlySavingsResponse>("/reports/monthly");
+export function getMonthlySavings(options?: { redirectOnUnauthorized?: boolean }) {
+  return request<MonthlySavingsResponse>("/reports/monthly", options);
 }
 
 function writeLoginHint() {
