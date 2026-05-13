@@ -103,6 +103,20 @@ class ReportControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.details[1].signedAmount").value(120000));
     }
 
+    @Test
+    void getMonthlyReportCountsExpiredAmountEvenAfterStatusChanged() throws Exception {
+        saveExpiredThenPurchasedWish(user1, "만료후구매", 45000L, 45000L);
+
+        org.springframework.mock.web.MockHttpSession session = loginSession("report-user1@example.com", "Password123!");
+
+        mockMvc.perform(get("/reports/monthly")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.expiredAmount").value(45000))
+                .andExpect(jsonPath("$.data.purchasedAmount").value(45000))
+                .andExpect(jsonPath("$.data.netSavedAmount").value(0));
+    }
+
     private org.springframework.mock.web.MockHttpSession loginSession(String email, String password) throws Exception {
         String loginRequest = objectMapper.writeValueAsString(Map.of("email", email, "password", password));
 
@@ -142,6 +156,22 @@ class ReportControllerIntegrationTest {
         wish.setExpireAt(LocalDateTime.now().plusDays(1));
         wish.setReactivatedCount(0);
         wish.setReferencePrice(effectivePrice);
+        productWishRepository.save(wish);
+    }
+
+    private void saveExpiredThenPurchasedWish(User owner, String productName, long savedAmount, long purchasedAmount) {
+        ProductWish wish = new ProductWish();
+        wish.setUser(owner);
+        wish.setProductName(productName);
+        wish.setProductUrl("https://example.com/" + productName.hashCode());
+        wish.setStatus(WishStatus.PURCHASED);
+        wish.setFirstRegisteredAt(LocalDateTime.now().minusDays(3));
+        wish.setLastViewedAt(LocalDateTime.now().minusDays(2));
+        wish.setExpireAt(LocalDateTime.now().minusDays(1));
+        wish.setExpiredAt(LocalDateTime.now().minusHours(6));
+        wish.setReactivatedCount(0);
+        wish.setReferencePrice(purchasedAmount);
+        wish.setSavedAmount(savedAmount);
         productWishRepository.save(wish);
     }
 }

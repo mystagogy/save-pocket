@@ -30,7 +30,6 @@ public class ReportService {
 
         long expiredAmount = reportRepository.sumExpiredAmountByUserAndPeriod(
                 userId,
-                WishStatus.EXPIRED,
                 start,
                 end
         );
@@ -41,7 +40,7 @@ public class ReportService {
                 end
         );
         List<MonthlySavingsDetailItemResponse> details = toDetailItems(
-                reportRepository.findExpiredDetailsByUserAndPeriod(userId, WishStatus.EXPIRED, start, end),
+                reportRepository.findExpiredDetailsByUserAndPeriod(userId, start, end),
                 reportRepository.findPurchasedDetailsByUserAndPeriod(userId, WishStatus.PURCHASED, start, end)
         );
 

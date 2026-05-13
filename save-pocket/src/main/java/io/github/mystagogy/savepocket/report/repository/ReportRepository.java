@@ -14,13 +14,11 @@ public interface ReportRepository extends Repository<ProductWish, Long> {
             select coalesce(sum(w.savedAmount), 0)
             from ProductWish w
             where w.user.id = :userId
-              and w.status = :expiredStatus
               and w.expiredAt >= :start
               and w.expiredAt < :end
             """)
     Long sumExpiredAmountByUserAndPeriod(
             @Param("userId") Long userId,
-            @Param("expiredStatus") WishStatus expiredStatus,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
@@ -47,14 +45,12 @@ public interface ReportRepository extends Repository<ProductWish, Long> {
                    coalesce(w.savedAmount, 0) as amount
             from ProductWish w
             where w.user.id = :userId
-              and w.status = :expiredStatus
               and w.expiredAt >= :start
               and w.expiredAt < :end
             order by w.expiredAt desc
             """)
     List<MonthlySavingsDetailProjection> findExpiredDetailsByUserAndPeriod(
             @Param("userId") Long userId,
-            @Param("expiredStatus") WishStatus expiredStatus,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
