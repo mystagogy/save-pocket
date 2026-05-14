@@ -1,9 +1,4 @@
-"use client";
-
-import { Suspense, FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ApiRequestError, createWish } from "@/lib/api";
-import { DealSourceType, WishCreateRequest } from "@/lib/types";
+import { DealSourceType } from "@/lib/types";
 
 const dealSourceOptions: { value: DealSourceType; label: string }[] = [
   { value: "NAVER", label: "네이버" },
@@ -12,82 +7,28 @@ const dealSourceOptions: { value: DealSourceType; label: string }[] = [
   { value: "MANUAL", label: "직접 입력" },
 ];
 
-export default function WishCreatePage() {
-  return (
-    <Suspense
-      fallback={
-        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
-          <p className="text-sm text-[#4b556d]">입력 화면을 준비 중입니다...</p>
-        </section>
-      }
-    >
-      <WishCreateForm />
-    </Suspense>
-  );
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function readValue(searchParams: SearchParams, key: string): string {
+  const value = searchParams[key];
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
 }
 
-function WishCreateForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default async function WishCreatePage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
 
-  const [form, setForm] = useState(() => ({
-    productUrl: searchParams.get("productUrl") ?? "",
-    productName: searchParams.get("productName") ?? "",
-    memo: "",
-    productImageUrl: searchParams.get("productImageUrl") ?? "",
-    referencePrice: searchParams.get("referencePrice") ?? "",
-    userDealPrice: "",
-    dealUrl: "",
-    dealSourceType: "",
-  }));
-
-  const handleChange = (field: keyof typeof form, value: string): void => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    const referencePrice =
-      form.referencePrice.trim() === "" ? undefined : Number(form.referencePrice);
-    const userDealPrice =
-      form.userDealPrice.trim() === "" ? undefined : Number(form.userDealPrice);
-
-    if (Number.isNaN(referencePrice ?? 0) || Number.isNaN(userDealPrice ?? 0)) {
-      setError("가격은 숫자로 입력해주세요.");
-      setSubmitting(false);
-      return;
-    }
-
-    const payload: WishCreateRequest = {
-      productUrl: form.productUrl,
-      productName: form.productName,
-      memo: form.memo || undefined,
-      productImageUrl: form.productImageUrl || undefined,
-      referencePrice,
-      userDealPrice,
-      dealUrl: form.dealUrl || undefined,
-      dealSourceType: (form.dealSourceType as DealSourceType | "") || undefined,
-    };
-
-    try {
-      const created = await createWish(payload);
-      router.push(`/wishes/${created.id}`);
-      router.refresh();
-    } catch (err) {
-      if (err instanceof ApiRequestError) {
-        setError(err.message);
-      } else {
-        setError("등록 중 알 수 없는 오류가 발생했습니다.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const productUrl = readValue(params, "productUrl");
+  const productName = readValue(params, "productName");
+  const productImageUrl = readValue(params, "productImageUrl");
+  const referencePrice = readValue(params, "referencePrice");
+  const error = readValue(params, "error");
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
@@ -96,13 +37,17 @@ function WishCreateForm() {
         자동 조회 실패 상황도 고려해 수동 입력 필드를 함께 제공합니다.
       </p>
 
-      <form className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+      <form
+        method="POST"
+        action="/wishes/create"
+        className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2"
+      >
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium">상품 URL *</span>
           <input
             required
-            value={form.productUrl}
-            onChange={(event) => handleChange("productUrl", event.target.value)}
+            name="productUrl"
+            defaultValue={productUrl}
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
             placeholder="https://..."
           />
@@ -112,8 +57,8 @@ function WishCreateForm() {
           <span className="mb-1 block text-sm font-medium">상품명 *</span>
           <input
             required
-            value={form.productName}
-            onChange={(event) => handleChange("productName", event.target.value)}
+            name="productName"
+            defaultValue={productName}
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
             placeholder="예: 나이키 운동화"
           />
@@ -123,8 +68,7 @@ function WishCreateForm() {
           <span className="mb-1 block text-sm font-medium">메모</span>
           <textarea
             rows={3}
-            value={form.memo}
-            onChange={(event) => handleChange("memo", event.target.value)}
+            name="memo"
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
             placeholder="이번엔 3일 동안 고민"
           />
@@ -133,8 +77,8 @@ function WishCreateForm() {
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium">상품 이미지 URL</span>
           <input
-            value={form.productImageUrl}
-            onChange={(event) => handleChange("productImageUrl", event.target.value)}
+            name="productImageUrl"
+            defaultValue={productImageUrl}
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
           />
         </label>
@@ -142,8 +86,8 @@ function WishCreateForm() {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">기준 가격</span>
           <input
-            value={form.referencePrice}
-            onChange={(event) => handleChange("referencePrice", event.target.value)}
+            name="referencePrice"
+            defaultValue={referencePrice}
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
             placeholder="129000"
           />
@@ -152,8 +96,7 @@ function WishCreateForm() {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">체감 최저가</span>
           <input
-            value={form.userDealPrice}
-            onChange={(event) => handleChange("userDealPrice", event.target.value)}
+            name="userDealPrice"
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
             placeholder="119000"
           />
@@ -162,8 +105,7 @@ function WishCreateForm() {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">딜 URL</span>
           <input
-            value={form.dealUrl}
-            onChange={(event) => handleChange("dealUrl", event.target.value)}
+            name="dealUrl"
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
           />
         </label>
@@ -171,8 +113,7 @@ function WishCreateForm() {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">딜 출처</span>
           <select
-            value={form.dealSourceType}
-            onChange={(event) => handleChange("dealSourceType", event.target.value)}
+            name="dealSourceType"
             className="w-full rounded-xl border border-[#d5dceb] px-3 py-2.5 text-sm outline-none ring-[#2b63e4] transition focus:ring-2"
           >
             <option value="">선택 안 함</option>
@@ -192,10 +133,9 @@ function WishCreateForm() {
 
         <button
           type="submit"
-          disabled={submitting}
-          className="md:col-span-2 rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#173da9] disabled:cursor-not-allowed disabled:bg-[#8ca8ec]"
+          className="md:col-span-2 rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#173da9]"
         >
-          {submitting ? "등록 중..." : "위시 등록"}
+          위시 등록
         </button>
       </form>
     </section>

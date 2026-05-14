@@ -129,9 +129,20 @@ export function login(payload: LoginRequest) {
   return request<AuthUserResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
-  }).then((response) => {
-    writeLoginHint();
-    return response;
+  }).then(async (response) => {
+    try {
+      await request<AuthUserResponse>("/auth/me", {
+        redirectOnUnauthorized: false,
+      });
+      writeLoginHint();
+      return response;
+    } catch {
+      throw new ApiRequestError(
+        "로그인은 성공했지만 세션이 유지되지 않았습니다. 같은 주소(IP/도메인)로 다시 접속 후 로그인해주세요.",
+        401,
+        "SESSION_NOT_PERSISTED",
+      );
+    }
   });
 }
 

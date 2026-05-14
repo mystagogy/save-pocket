@@ -67,6 +67,22 @@ public class AuthService {
         return new AuthUserResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname());
     }
 
+    public AuthUserResponse me(HttpServletRequest servletRequest) {
+        HttpSession session = servletRequest.getSession(false);
+        if (session == null) {
+            throw new SavePocketException(ErrorCode.UNAUTHORIZED);
+        }
+
+        Object userIdValue = session.getAttribute(AuthSessionConstants.USER_ID);
+        if (!(userIdValue instanceof Long userId)) {
+            throw new SavePocketException(ErrorCode.UNAUTHORIZED);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new SavePocketException(ErrorCode.UNAUTHORIZED));
+        return new AuthUserResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+
     public void logout(HttpServletRequest servletRequest) {
         HttpSession session = servletRequest.getSession(false);
         if (session == null || session.getAttribute(AuthSessionConstants.USER_ID) == null) {
