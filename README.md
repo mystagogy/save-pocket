@@ -63,6 +63,51 @@ npm run dev
 프론트는 `/sp/*` 경로를 백엔드로 프록시합니다.
 필요 시 `my-webapp`에서 `BACKEND_ORIGIN` 환경변수로 백엔드 주소를 변경할 수 있습니다.
 
+## Redis 운영 가이드
+현재 Redis는 다음 두 용도로 사용합니다.
+- 세션 저장소: `spring.session.store-type=redis`
+- 월간 리포트 캐시: `spring.cache.type=redis`
+
+주요 환경변수(`save-pocket/.env`):
+- `REDIS_HOST` (기본 `localhost`)
+- `REDIS_PORT` (기본 `6379`)
+- `REDIS_PASSWORD` (비어 있으면 무암호)
+- `SESSION_TIMEOUT` (기본 `30m`)
+- `SESSION_NAMESPACE` (기본 `save-pocket:session`)
+- `REPORT_CACHE_TTL` (기본 `PT10M`)
+
+### 캐시/세션 확인 방법
+1) Redis 컨테이너 상태 확인
+```bash
+cd save-pocket
+docker compose ps
+```
+
+2) 월간 리포트 캐시 키 확인
+```bash
+# 비밀번호 설정 시
+docker compose exec redis redis-cli -a "$REDIS_PASSWORD" --scan --pattern 'monthlySavings*'
+
+# 무암호 Redis일 때
+docker compose exec redis redis-cli --scan --pattern 'monthlySavings*'
+```
+
+3) TTL 확인
+```bash
+docker compose exec redis redis-cli TTL 'monthlySavings::1:2026:5'
+```
+
+4) 세션 키 확인
+```bash
+docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
+```
+
+### 무효화 정책
+- 월간 리포트 캐시 키 형식: `monthlySavings::<userId>:<year>:<month>`
+- 위시 상태 변경(구매/삭제/재활성화), 만료 스케줄 실행 시 캐시 무효화
+- 무효화 시점: 트랜잭션 `afterCommit` (커밋 후 Redis eviction)
+
 ## 문서
 - 기획안: [docs/project-plan.md](docs/project-plan.md)
 - DB/API 설계서: [docs/db-api-design.md](docs/db-api-design.md)
+- Redis 학습 가이드: [docs/redis-guide.md](docs/redis-guide.md)
