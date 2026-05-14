@@ -1,5 +1,6 @@
 package io.github.mystagogy.savepocket.report.dto;
 
+import java.io.Serializable;
 import java.util.List;
 
 public record MonthlySavingsResponse(
@@ -9,5 +10,5 @@ public record MonthlySavingsResponse(
         long purchasedAmount,
         long netSavedAmount,
         List<MonthlySavingsDetailItemResponse> details
-) {
+) implements Serializable {
 }

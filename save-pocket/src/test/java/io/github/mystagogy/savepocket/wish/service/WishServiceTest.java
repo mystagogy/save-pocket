@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
+import io.github.mystagogy.savepocket.report.service.ReportCacheService;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSearchItemResponse;
@@ -58,6 +60,9 @@ class WishServiceTest {
     @Mock
     private NaverShoppingSearchClient naverShoppingSearchClient;
 
+    @Mock
+    private ReportCacheService reportCacheService;
+
     private WishService wishService;
 
     @BeforeEach
@@ -67,7 +72,8 @@ class WishServiceTest {
                 wishEventHistoryRepository,
                 priceHistoryRepository,
                 userRepository,
-                naverShoppingSearchClient
+                naverShoppingSearchClient,
+                reportCacheService
         );
     }
 
@@ -195,6 +201,8 @@ class WishServiceTest {
         ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.PURCHASED);
+        verify(productWishRepository).flush();
+        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // 이미 구매 완료된 위시에 구매 요청하면 상태 전이 예외를 반환해야 한다.
@@ -229,6 +237,8 @@ class WishServiceTest {
         ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.DELETED);
+        verify(productWishRepository).flush();
+        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // EXPIRED 상태 위시를 보류 재추가하면 WAITING으로 복귀하고 재활성화 정보가 갱신되어야 한다.
@@ -257,6 +267,8 @@ class WishServiceTest {
         ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.REACTIVATED);
+        verify(productWishRepository).flush();
+        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // WAITING 상태 위시를 보류 재추가 요청하면 상태 전이 예외를 반환해야 한다.
@@ -293,14 +305,17 @@ class WishServiceTest {
     @Test
     void expireDueWishesUpdatesStatusAndCreatesEvent() {
         LocalDateTime targetTime = LocalDateTime.of(2026, 5, 12, 18, 0);
+        User owner = createUser(1L, "owner@example.com");
 
         ProductWish wishWithDealPrice = new ProductWish();
+        wishWithDealPrice.setUser(owner);
         wishWithDealPrice.setStatus(WishStatus.WAITING);
         wishWithDealPrice.setReferencePrice(120000L);
         wishWithDealPrice.setUserDealPrice(110000L);
         ReflectionTestUtils.setField(wishWithDealPrice, "id", 21L);
 
         ProductWish wishWithReferencePrice = new ProductWish();
+        wishWithReferencePrice.setUser(owner);
         wishWithReferencePrice.setStatus(WishStatus.WAITING);
         wishWithReferencePrice.setReferencePrice(90000L);
         ReflectionTestUtils.setField(wishWithReferencePrice, "id", 22L);
@@ -327,6 +342,8 @@ class WishServiceTest {
                     assertThat(event.getEventType()).isEqualTo(WishEventType.EXPIRED);
                     assertThat(event.getEventAt()).isEqualTo(targetTime);
                 });
+        verify(reportCacheService, times(1))
+                .evictMonthlySavings(eq(1L), eq(2026), eq(5));
     }
 
     // 만료 대상이 없으면 상태 변경과 이벤트 저장 없이 0을 반환해야 한다.
@@ -341,6 +358,7 @@ class WishServiceTest {
         assertThat(expiredCount).isZero();
         verify(wishEventHistoryRepository, never()).save(any(WishEventHistory.class));
         verify(productWishRepository).findByStatusAndExpireAtLessThanEqual(eq(WishStatus.WAITING), eq(targetTime));
+        verify(reportCacheService, never()).evictMonthlySavings(any(Long.class), any(Integer.class), any(Integer.class));
     }
 
     private User createUser(Long id, String email) {
