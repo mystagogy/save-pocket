@@ -235,7 +235,7 @@ public class WishService {
         }
 
         for (UserMonthCacheKey evictTarget : evictTargets) {
-            reportCacheService.evictMonthlySavings(
+            reportCacheService.evictMonthlySavingsAfterCommit(
                     evictTarget.userId(),
                     evictTarget.yearMonth().getYear(),
                     evictTarget.yearMonth().getMonthValue()
@@ -295,7 +295,7 @@ public class WishService {
         }
 
         for (YearMonth yearMonth : yearMonths) {
-            reportCacheService.evictMonthlySavings(
+            reportCacheService.evictMonthlySavingsAfterCommit(
                     userId,
                     yearMonth.getYear(),
                     yearMonth.getMonthValue()

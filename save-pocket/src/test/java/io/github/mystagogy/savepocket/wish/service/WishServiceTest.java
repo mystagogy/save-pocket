@@ -202,7 +202,8 @@ class WishServiceTest {
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.PURCHASED);
         verify(productWishRepository).flush();
-        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
+        verify(reportCacheService, atLeastOnce())
+                .evictMonthlySavingsAfterCommit(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // 이미 구매 완료된 위시에 구매 요청하면 상태 전이 예외를 반환해야 한다.
@@ -238,7 +239,8 @@ class WishServiceTest {
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.DELETED);
         verify(productWishRepository).flush();
-        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
+        verify(reportCacheService, atLeastOnce())
+                .evictMonthlySavingsAfterCommit(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // EXPIRED 상태 위시를 보류 재추가하면 WAITING으로 복귀하고 재활성화 정보가 갱신되어야 한다.
@@ -268,7 +270,8 @@ class WishServiceTest {
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.REACTIVATED);
         verify(productWishRepository).flush();
-        verify(reportCacheService, atLeastOnce()).evictMonthlySavings(eq(1L), any(Integer.class), any(Integer.class));
+        verify(reportCacheService, atLeastOnce())
+                .evictMonthlySavingsAfterCommit(eq(1L), any(Integer.class), any(Integer.class));
     }
 
     // WAITING 상태 위시를 보류 재추가 요청하면 상태 전이 예외를 반환해야 한다.
@@ -343,7 +346,7 @@ class WishServiceTest {
                     assertThat(event.getEventAt()).isEqualTo(targetTime);
                 });
         verify(reportCacheService, times(1))
-                .evictMonthlySavings(eq(1L), eq(2026), eq(5));
+                .evictMonthlySavingsAfterCommit(eq(1L), eq(2026), eq(5));
     }
 
     // 만료 대상이 없으면 상태 변경과 이벤트 저장 없이 0을 반환해야 한다.
@@ -358,7 +361,8 @@ class WishServiceTest {
         assertThat(expiredCount).isZero();
         verify(wishEventHistoryRepository, never()).save(any(WishEventHistory.class));
         verify(productWishRepository).findByStatusAndExpireAtLessThanEqual(eq(WishStatus.WAITING), eq(targetTime));
-        verify(reportCacheService, never()).evictMonthlySavings(any(Long.class), any(Integer.class), any(Integer.class));
+        verify(reportCacheService, never())
+                .evictMonthlySavingsAfterCommit(any(Long.class), any(Integer.class), any(Integer.class));
     }
 
     private User createUser(Long id, String email) {
