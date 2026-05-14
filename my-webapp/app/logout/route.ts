@@ -19,6 +19,7 @@ async function doLogout(request: Request) {
 
   const response = NextResponse.redirect(new URL("/login", request.url), 303);
   response.cookies.delete("SESSION");
+  response.cookies.delete("JSESSIONID");
   return response;
 }
 
