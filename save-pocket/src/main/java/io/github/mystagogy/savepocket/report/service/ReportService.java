@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,10 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = ReportCacheService.MONTHLY_SAVINGS_CACHE,
+            key = "T(io.github.mystagogy.savepocket.report.service.ReportCacheService).monthlyKey(#userId, #year, #month)"
+    )
     public MonthlySavingsResponse getMonthlySavings(Long userId, int year, int month) {
         LocalDate monthStart = LocalDate.of(year, month, 1);
         LocalDateTime start = monthStart.atStartOfDay();

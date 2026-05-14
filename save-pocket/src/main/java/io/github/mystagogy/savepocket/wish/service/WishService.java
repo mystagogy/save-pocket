@@ -4,6 +4,7 @@ import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
+import io.github.mystagogy.savepocket.report.service.ReportCacheService;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishDetailResponse;
@@ -23,8 +24,11 @@ import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import io.github.mystagogy.savepocket.wish.repository.WishEventHistoryRepository;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,19 +43,22 @@ public class WishService {
     private final PriceHistoryRepository priceHistoryRepository;
     private final UserRepository userRepository;
     private final NaverShoppingSearchClient naverShoppingSearchClient;
+    private final ReportCacheService reportCacheService;
 
     public WishService(
             ProductWishRepository productWishRepository,
             WishEventHistoryRepository wishEventHistoryRepository,
             PriceHistoryRepository priceHistoryRepository,
             UserRepository userRepository,
-            NaverShoppingSearchClient naverShoppingSearchClient
+            NaverShoppingSearchClient naverShoppingSearchClient,
+            ReportCacheService reportCacheService
     ) {
         this.productWishRepository = productWishRepository;
         this.wishEventHistoryRepository = wishEventHistoryRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.userRepository = userRepository;
         this.naverShoppingSearchClient = naverShoppingSearchClient;
+        this.reportCacheService = reportCacheService;
     }
 
     @Transactional
@@ -165,8 +172,13 @@ public class WishService {
     public WishStatusUpdateResponse purchaseWish(Long userId, Long wishId) {
         ProductWish wish = getAccessibleWish(userId, wishId);
         validateStatusTransition(wish.getStatus(), WishStatus.PURCHASED);
+        LocalDateTime previousUpdatedAt = wish.getUpdatedAt();
+        LocalDateTime previousExpiredAt = wish.getExpiredAt();
+        LocalDateTime now = LocalDateTime.now();
         wish.setStatus(WishStatus.PURCHASED);
-        appendEvent(wish, WishEventType.PURCHASED, LocalDateTime.now());
+        appendEvent(wish, WishEventType.PURCHASED, now);
+        productWishRepository.flush();
+        evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
 
@@ -174,8 +186,13 @@ public class WishService {
     public WishStatusUpdateResponse deleteWish(Long userId, Long wishId) {
         ProductWish wish = getAccessibleWish(userId, wishId);
         validateStatusTransition(wish.getStatus(), WishStatus.DELETED);
+        LocalDateTime previousUpdatedAt = wish.getUpdatedAt();
+        LocalDateTime previousExpiredAt = wish.getExpiredAt();
+        LocalDateTime now = LocalDateTime.now();
         wish.setStatus(WishStatus.DELETED);
-        appendEvent(wish, WishEventType.DELETED, LocalDateTime.now());
+        appendEvent(wish, WishEventType.DELETED, now);
+        productWishRepository.flush();
+        evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
 
@@ -184,6 +201,8 @@ public class WishService {
         ProductWish wish = getAccessibleWish(userId, wishId);
         validateReactivationStatus(wish.getStatus());
 
+        LocalDateTime previousUpdatedAt = wish.getUpdatedAt();
+        LocalDateTime previousExpiredAt = wish.getExpiredAt();
         LocalDateTime now = LocalDateTime.now();
         wish.setStatus(WishStatus.WAITING);
         wish.setLastViewedAt(now);
@@ -192,6 +211,8 @@ public class WishService {
         wish.setSavedAmount(null);
         wish.setReactivatedCount(wish.getReactivatedCount() + 1);
         appendEvent(wish, WishEventType.REACTIVATED, now);
+        productWishRepository.flush();
+        evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
 
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
@@ -203,11 +224,22 @@ public class WishService {
                 targetTime
         );
 
+        Set<UserMonthCacheKey> evictTargets = new HashSet<>();
+
         for (ProductWish wish : dueWishes) {
             wish.setStatus(WishStatus.EXPIRED);
             wish.setExpiredAt(targetTime);
             wish.setSavedAmount(wish.effectivePrice());
             appendEvent(wish, WishEventType.EXPIRED, targetTime);
+            evictTargets.add(new UserMonthCacheKey(wish.getUser().getId(), YearMonth.from(targetTime)));
+        }
+
+        for (UserMonthCacheKey evictTarget : evictTargets) {
+            reportCacheService.evictMonthlySavingsAfterCommit(
+                    evictTarget.userId(),
+                    evictTarget.yearMonth().getYear(),
+                    evictTarget.yearMonth().getMonthValue()
+            );
         }
 
         return dueWishes.size();
@@ -251,6 +283,31 @@ public class WishService {
         event.setEventType(eventType);
         event.setEventAt(eventAt);
         wishEventHistoryRepository.save(event);
+    }
+
+    private void evictMonthlySavingsCache(Long userId, LocalDateTime... candidateDateTimes) {
+        Set<YearMonth> yearMonths = new HashSet<>();
+        for (LocalDateTime candidateDateTime : candidateDateTimes) {
+            if (candidateDateTime == null) {
+                continue;
+            }
+            yearMonths.add(YearMonth.from(candidateDateTime));
+        }
+
+        for (YearMonth yearMonth : yearMonths) {
+            reportCacheService.evictMonthlySavingsAfterCommit(
+                    userId,
+                    yearMonth.getYear(),
+                    yearMonth.getMonthValue()
+            );
+        }
+    }
+
+    private LocalDateTime resolveCurrentUpdatedAt(ProductWish wish, LocalDateTime fallback) {
+        return wish.getUpdatedAt() != null ? wish.getUpdatedAt() : fallback;
+    }
+
+    private record UserMonthCacheKey(Long userId, YearMonth yearMonth) {
     }
 
     private WishPriceHistoryItem toPriceHistoryItem(PriceHistory priceHistory) {

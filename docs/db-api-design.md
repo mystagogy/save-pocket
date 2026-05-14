@@ -327,3 +327,29 @@ ON wish_event_history (wish_id, event_at DESC);
 - [ ] 가격 변동 시 `price_history` + `PRICE_CHANGED` 이벤트 생성 테스트
 - [ ] 인증 없는 접근 차단(401) 테스트
 - [ ] 타 사용자 리소스 접근 차단(403) 테스트
+
+## 6. Redis/캐시 설계
+
+### 6.1 세션 저장소
+- Spring Session Redis 사용
+- 설정 키:
+  - `spring.session.store-type=redis`
+  - `spring.session.timeout`
+  - `spring.session.redis.namespace`
+- 기본 namespace: `save-pocket:session`
+
+### 6.2 월간 리포트 캐시
+- 대상 API: `GET /reports/monthly`
+- 캐시 키: `monthlySavings::<userId>:<year>:<month>`
+- TTL: `REPORT_CACHE_TTL` (기본 `PT10M`)
+- 값: `MonthlySavingsResponse` 직렬화 결과
+
+### 6.3 캐시 무효화 규칙
+- 무효화 트리거:
+  - 위시 구매(`PURCHASED`)
+  - 위시 삭제(`DELETED`)
+  - 위시 재활성화(`REACTIVATED`)
+  - 만료 스케줄(`EXPIRED`)
+- 무효화 시점:
+  - 트랜잭션 내부 즉시 삭제가 아니라 `afterCommit`에 수행
+  - DB 커밋 전에 캐시가 오래된 데이터로 재생성되는 경쟁 상태를 방지

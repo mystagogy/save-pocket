@@ -1,6 +1,7 @@
 package io.github.mystagogy.savepocket.report.dto;
 
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 public record MonthlySavingsDetailItemResponse(
@@ -9,5 +10,5 @@ public record MonthlySavingsDetailItemResponse(
         WishStatus status,
         LocalDateTime occurredAt,
         long signedAmount
-) {
+) implements Serializable {
 }
