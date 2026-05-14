@@ -32,7 +32,7 @@ export default function HomePage() {
       setNeedLogin(false);
 
       try {
-        const response = await getMonthlySavings();
+        const response = await getMonthlySavings({ redirectOnUnauthorized: false });
         if (!cancelled) {
           setSummary(response);
         }
