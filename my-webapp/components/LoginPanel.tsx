@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ApiRequestError, login } from "@/lib/api";
 
 export default function LoginPanel() {
@@ -15,6 +15,10 @@ export default function LoginPanel() {
   const reason = searchParams.get("reason");
   const redirectParam = searchParams.get("redirect");
   const redirectTarget = sanitizeRedirectPath(redirectParam);
+
+  useEffect(() => {
+    (window as typeof window & { __spLoginHydrated?: boolean }).__spLoginHydrated = true;
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -66,7 +70,7 @@ export default function LoginPanel() {
           </h1>
         </div>
 
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+        <form id="login-form" className="mt-8 space-y-4" onSubmit={handleSubmit}>
           {reason === "expired" && (
             <p className="rounded-xl bg-[#fff5d6] px-3 py-2 text-sm text-[#7a4a00]">
               세션이 만료되었습니다. 다시 로그인해주세요.
@@ -80,6 +84,8 @@ export default function LoginPanel() {
           <label className="block">
             <span className="mb-1 block text-sm font-medium">이메일</span>
             <input
+              id="login-email"
+              name="email"
               type="email"
               required
               value={email}
@@ -92,6 +98,8 @@ export default function LoginPanel() {
           <label className="block">
             <span className="mb-1 block text-sm font-medium">비밀번호</span>
             <input
+              id="login-password"
+              name="password"
               type="password"
               required
               value={password}
@@ -102,13 +110,14 @@ export default function LoginPanel() {
           </label>
 
           {error && (
-            <p className="rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">
+            <p id="login-error" className="rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">
               {error}
             </p>
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
+              id="login-submit"
               type="submit"
               disabled={submitting}
               className="rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#173da9] disabled:cursor-not-allowed disabled:bg-[#8ca8ec]"
@@ -130,6 +139,9 @@ export default function LoginPanel() {
 
 function sanitizeRedirectPath(path: string | null): string {
   if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return "/";
+  }
+  if (path === "/?") {
     return "/";
   }
   return path;
