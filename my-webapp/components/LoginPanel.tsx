@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { ApiRequestError, login } from "@/lib/api";
 
 export default function LoginPanel() {
@@ -15,10 +15,6 @@ export default function LoginPanel() {
   const reason = searchParams.get("reason");
   const redirectParam = searchParams.get("redirect");
   const redirectTarget = sanitizeRedirectPath(redirectParam);
-
-  useEffect(() => {
-    (window as typeof window & { __spLoginHydrated?: boolean }).__spLoginHydrated = true;
-  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

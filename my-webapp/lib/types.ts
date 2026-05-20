@@ -33,6 +33,7 @@ export interface SignupRequest {
 
 export interface WishCreateRequest {
   productUrl: string;
+  trackedProductId?: string;
   memo?: string;
   productName: string;
   productImageUrl?: string;
@@ -68,6 +69,7 @@ export interface WishSummaryResponse {
 export interface WishSearchItemResponse {
   name: string;
   url: string;
+  productId: string | null;
   imageUrl: string | null;
   referencePrice: number | null;
   mallName: string | null;

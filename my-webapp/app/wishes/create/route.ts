@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
 
   const productUrl = String(formData.get("productUrl") ?? "").trim();
+  const trackedProductId = String(formData.get("trackedProductId") ?? "").trim();
   const productName = String(formData.get("productName") ?? "").trim();
   const memo = String(formData.get("memo") ?? "").trim();
   const productImageUrl = String(formData.get("productImageUrl") ?? "").trim();
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
 
   const payload = {
     productUrl,
+    trackedProductId: trackedProductId || undefined,
     productName,
     memo: memo || undefined,
     productImageUrl: productImageUrl || undefined,

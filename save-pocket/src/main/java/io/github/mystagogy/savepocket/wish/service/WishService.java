@@ -16,6 +16,7 @@ import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingProduct;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingSearchClient;
 import io.github.mystagogy.savepocket.wish.entity.PriceHistory;
+import io.github.mystagogy.savepocket.wish.entity.PriceType;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishEventHistory;
 import io.github.mystagogy.savepocket.wish.entity.WishEventType;
@@ -23,20 +24,25 @@ import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import io.github.mystagogy.savepocket.wish.repository.WishEventHistoryRepository;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class WishService {
 
     private static final long EXPIRE_HOURS = 72L;
+    private static final List<String> TRACKED_PRODUCT_ID_QUERY_KEYS = List.of("id", "nvMid", "productNo");
 
     private final ProductWishRepository productWishRepository;
     private final WishEventHistoryRepository wishEventHistoryRepository;
@@ -71,6 +77,7 @@ public class WishService {
         wish.setUser(user);
         wish.setProductName(request.productName());
         wish.setProductUrl(request.productUrl());
+        wish.setTrackedProductId(resolveTrackedProductId(request.trackedProductId(), request.productUrl()));
         wish.setProductImageUrl(request.productImageUrl());
         wish.setMemo(request.memo());
         wish.setReferencePrice(request.referencePrice());
@@ -245,6 +252,57 @@ public class WishService {
         return dueWishes.size();
     }
 
+    @Transactional
+    public PriceRefreshResult refreshLowestReferencePrices(LocalDateTime targetTime) {
+        List<ProductWish> waitingWishes = productWishRepository.findByStatus(WishStatus.WAITING);
+
+        int scannedCount = 0;
+        int updatedCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+
+        for (ProductWish wish : waitingWishes) {
+            scannedCount++;
+            try {
+                Long latestLowestPrice = resolveLatestLowestPrice(wish);
+                if (latestLowestPrice == null) {
+                    skippedCount++;
+                    continue;
+                }
+
+                Long previousReferencePrice = wish.getReferencePrice();
+                if (Objects.equals(previousReferencePrice, latestLowestPrice)) {
+                    skippedCount++;
+                    continue;
+                }
+
+                wish.setReferencePrice(latestLowestPrice);
+                appendEvent(
+                        wish,
+                        WishEventType.PRICE_CHANGED,
+                        targetTime,
+                        "기준가 자동 갱신: " + previousReferencePrice + " -> " + latestLowestPrice
+                );
+
+                if (previousReferencePrice != null) {
+                    appendPriceHistory(
+                            wish,
+                            PriceType.REFERENCE,
+                            previousReferencePrice,
+                            latestLowestPrice,
+                            targetTime
+                    );
+                }
+
+                updatedCount++;
+            } catch (RuntimeException ex) {
+                failedCount++;
+            }
+        }
+
+        return new PriceRefreshResult(scannedCount, updatedCount, skippedCount, failedCount);
+    }
+
     private ProductWish getAccessibleWish(Long userId, Long wishId) {
         return productWishRepository.findByIdAndUser_Id(wishId, userId)
                 .orElseThrow(() -> {
@@ -278,11 +336,32 @@ public class WishService {
     }
 
     private void appendEvent(ProductWish wish, WishEventType eventType, LocalDateTime eventAt) {
+        appendEvent(wish, eventType, eventAt, null);
+    }
+
+    private void appendEvent(ProductWish wish, WishEventType eventType, LocalDateTime eventAt, String description) {
         WishEventHistory event = new WishEventHistory();
         event.setWish(wish);
         event.setEventType(eventType);
         event.setEventAt(eventAt);
+        event.setDescription(description);
         wishEventHistoryRepository.save(event);
+    }
+
+    private void appendPriceHistory(
+            ProductWish wish,
+            PriceType priceType,
+            Long previousPrice,
+            Long changedPrice,
+            LocalDateTime changedAt
+    ) {
+        PriceHistory priceHistory = new PriceHistory();
+        priceHistory.setWish(wish);
+        priceHistory.setPriceType(priceType);
+        priceHistory.setPreviousPrice(previousPrice);
+        priceHistory.setChangedPrice(changedPrice);
+        priceHistory.setChangedAt(changedAt);
+        priceHistoryRepository.save(priceHistory);
     }
 
     private void evictMonthlySavingsCache(Long userId, LocalDateTime... candidateDateTimes) {
@@ -307,7 +386,147 @@ public class WishService {
         return wish.getUpdatedAt() != null ? wish.getUpdatedAt() : fallback;
     }
 
+    private Long resolveLatestLowestPrice(ProductWish wish) {
+        String trackedProductId = wish.getTrackedProductId();
+        if (!StringUtils.hasText(trackedProductId)) {
+            trackedProductId = extractProductIdFromUrl(wish.getProductUrl());
+            if (StringUtils.hasText(trackedProductId)) {
+                wish.setTrackedProductId(trackedProductId);
+            }
+        }
+
+        if (!StringUtils.hasText(trackedProductId)) {
+            return null;
+        }
+
+        final String finalTrackedProductId = trackedProductId;
+
+        return naverShoppingSearchClient.searchProducts(finalTrackedProductId).stream()
+                .filter(product -> isTrackedProductMatched(product, finalTrackedProductId))
+                .map(NaverShoppingProduct::lowestPrice)
+                .filter(Objects::nonNull)
+                .min(Long::compareTo)
+                .orElse(null);
+    }
+
+    private String resolveTrackedProductId(String requestTrackedProductId, String productUrl) {
+        String urlDerivedProductId = extractProductIdFromUrl(productUrl);
+        if (StringUtils.hasText(urlDerivedProductId)) {
+            return urlDerivedProductId;
+        }
+
+        if (StringUtils.hasText(requestTrackedProductId)) {
+            return requestTrackedProductId.trim();
+        }
+        return null;
+    }
+
+    private boolean isTrackedProductMatched(NaverShoppingProduct product, String trackedProductId) {
+        if (trackedProductId.equals(product.productId())) {
+            return true;
+        }
+        String productIdFromUrl = extractProductIdFromUrl(product.link());
+        return trackedProductId.equals(productIdFromUrl);
+    }
+
+    private String extractProductIdFromUrl(String rawUrl) {
+        if (!StringUtils.hasText(rawUrl)) {
+            return null;
+        }
+
+        String normalizedUrl = rawUrl.replace("&amp;", "&").trim();
+        if (normalizedUrl.startsWith("//")) {
+            normalizedUrl = "https:" + normalizedUrl;
+        }
+
+        try {
+            URI uri = URI.create(normalizedUrl);
+            String fromQuery = extractProductIdFromQuery(uri.getRawQuery());
+            if (StringUtils.hasText(fromQuery)) {
+                return fromQuery;
+            }
+            String fromPath = extractProductIdFromPath(uri.getPath());
+            if (StringUtils.hasText(fromPath)) {
+                return fromPath;
+            }
+        } catch (RuntimeException ignored) {
+            // URL 형식이 예상과 달라도 전체 문자열에서 마지막 숫자 시퀀스를 찾기 위해 아래 fallback을 사용한다.
+        }
+
+        return extractProductIdFromPath(normalizedUrl);
+    }
+
+    private String extractProductIdFromQuery(String rawQuery) {
+        if (!StringUtils.hasText(rawQuery)) {
+            return null;
+        }
+
+        for (String pair : rawQuery.split("&")) {
+            int delimiterIndex = pair.indexOf('=');
+            if (delimiterIndex <= 0 || delimiterIndex >= pair.length() - 1) {
+                continue;
+            }
+            String key = decodeUrlComponent(pair.substring(0, delimiterIndex));
+            String value = decodeUrlComponent(pair.substring(delimiterIndex + 1));
+            if (!containsIgnoreCase(TRACKED_PRODUCT_ID_QUERY_KEYS, key)) {
+                continue;
+            }
+            if (!StringUtils.hasText(value)) {
+                continue;
+            }
+            return value.trim();
+        }
+        return null;
+    }
+
+    private String extractProductIdFromPath(String path) {
+        if (!StringUtils.hasText(path)) {
+            return null;
+        }
+
+        String[] tokens = path.split("/");
+        for (int i = 0; i < tokens.length - 1; i++) {
+            String token = tokens[i];
+            if (!"catalog".equalsIgnoreCase(token)
+                    && !"products".equalsIgnoreCase(token)
+                    && !"item".equalsIgnoreCase(token)) {
+                continue;
+            }
+            String candidate = tokens[i + 1].trim();
+            if (StringUtils.hasText(candidate)) {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private String decodeUrlComponent(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            return value;
+        }
+    }
+
+    private boolean containsIgnoreCase(List<String> candidates, String target) {
+        for (String candidate : candidates) {
+            if (candidate.equalsIgnoreCase(target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private record UserMonthCacheKey(Long userId, YearMonth yearMonth) {
+    }
+
+    public record PriceRefreshResult(
+            int scannedCount,
+            int updatedCount,
+            int skippedCount,
+            int failedCount
+    ) {
     }
 
     private WishPriceHistoryItem toPriceHistoryItem(PriceHistory priceHistory) {
@@ -334,6 +553,7 @@ public class WishService {
         return new WishSearchItemResponse(
                 product.title(),
                 product.link(),
+                product.productId(),
                 product.image(),
                 product.lowestPrice(),
                 product.mallName()

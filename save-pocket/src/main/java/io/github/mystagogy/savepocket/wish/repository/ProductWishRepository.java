@@ -16,5 +16,7 @@ public interface ProductWishRepository extends JpaRepository<ProductWish, Long> 
 
     List<ProductWish> findByStatusAndExpireAtLessThanEqual(WishStatus status, LocalDateTime targetTime);
 
+    List<ProductWish> findByStatus(WishStatus status);
+
     long countByUser_IdAndStatusAndExpiredAtBetween(Long userId, WishStatus status, LocalDateTime start, LocalDateTime end);
 }
