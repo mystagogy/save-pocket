@@ -1,5 +1,7 @@
 # 작심삼일 긴축재정
 
+운영 URL: https://save-pocket.vercel.app
+
 충동구매를 줄이기 위해 상품을 일정 기간 보류하고, 관심이 사라진 상품을 절약 금액으로 기록하는 소비 관리 서비스입니다.
 
 ## 프로젝트 소개
@@ -20,6 +22,10 @@
 ## 프로젝트 구성
 - 백엔드 API: `save-pocket` (Spring Boot)
 - 프론트엔드 웹앱: `my-webapp` (Next.js)
+
+## 배포 주소
+- 프론트(운영): `https://save-pocket.vercel.app`
+- 백엔드 API(운영): `https://save-pocket.up.railway.app`
 
 ## 기술 스택
 - 백엔드

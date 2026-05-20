@@ -2,6 +2,9 @@
 
 작심삼일 긴축재정 프론트엔드(Next.js App Router) 프로젝트입니다.
 
+## 운영 주소
+- `https://save-pocket.vercel.app`
+
 ## 실행
 ```bash
 npm install
@@ -10,6 +13,11 @@ npm run dev
 
 - 기본 주소: `http://localhost:3000`
 - 백엔드 API 프록시: `/sp/*` -> `BACKEND_ORIGIN` (기본 `http://localhost:8080`)
+
+원격 백엔드(Railway) 연동 로컬 실행:
+```bash
+npm run dev:remote
+```
 
 ## 주요 페이지
 - `/login` 로그인
