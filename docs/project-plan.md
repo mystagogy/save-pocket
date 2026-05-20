@@ -27,6 +27,7 @@
 ### 5.2 상품 등록
 - 입력: 상품 URL, 메모(선택)
 - 자동 조회: 상품명, 이미지, 기준 가격
+- 상품 식별자(`trackedProductId`) 저장(검색 결과 또는 URL 파싱)
 - 자동 조회 실패 시 수동 입력 폴백 허용
 
 ### 5.3 관심 기반 만료 로직
@@ -40,10 +41,15 @@
 - 삭제 시 `DELETED` (소프트 삭제 성격)
 
 ### 5.5 가격 추적
-- 6시간 주기로 가격 재조회
-- 변동 시 이력 저장
+- 1시간 주기로 가격 재조회(환경변수로 주기 조정 가능)
+- `trackedProductId` 일치 상품만 반영해 오탐 방지
+- 변동 시 `price_history` + `PRICE_CHANGED` 이벤트 저장
 
-### 5.6 월 리포트
+### 5.6 스케줄 실행 이력
+- 만료/가격 갱신 스케줄 실행 결과를 `scheduler_run_history`에 저장
+- 상태(`SUCCESS`, `PARTIAL_SUCCESS`, `FAILED`) 및 처리 건수 기록
+
+### 5.7 월 리포트
 - 참은 상품 수
 - 총 절약 금액
 - 가격 하락 상품 수
@@ -82,8 +88,8 @@
 
 ## 9. 스케줄 정책
 - 시간대: `Asia/Seoul`
-- 만료 판정 스케줄: 10분 주기
-- 가격 갱신 스케줄: 6시간 주기
+- 만료 판정 스케줄: 기본 10분 주기 (`WISH_EXPIRATION_CRON`)
+- 가격 갱신 스케줄: 기본 1시간 주기 (`WISH_PRICE_REFRESH_CRON`)
 - 실패 처리: 상품 단위 실패 격리, 전체 배치 중단 방지
 
 ## 10. 기술 스택
@@ -109,11 +115,12 @@
 
 ### Wish
 - `POST /wishes`
+- `GET /wishes/search?query=...`
 - `GET /wishes?status=...`
 - `GET /wishes/{id}`
-- `POST /wishes/{id}/view`
 - `POST /wishes/{id}/purchase`
 - `POST /wishes/{id}/delete`
+- `POST /wishes/{id}/reactivate`
 
 ### 리포트
 - `GET /reports/monthly?year=YYYY&month=MM`

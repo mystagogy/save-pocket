@@ -1,4 +1,4 @@
-# 작심삼일 긴축재정 - DB/API 설계서 (MVP v1)
+# 작심삼일 긴축재정 - DB/API 설계서 (MVP v2)
 
 ## 1. 설계 원칙
 - 타임존: `Asia/Seoul`
@@ -13,6 +13,7 @@
 - `users (1) ---- (N) product_wish`
 - `product_wish (1) ---- (N) price_history`
 - `product_wish (1) ---- (N) wish_event_history`
+- `scheduler_run_history` (스케줄 실행 로그 독립 테이블)
 
 ## 2.2 테이블 정의
 
@@ -33,6 +34,7 @@
 | user_id | BIGINT | NOT NULL, FK(users.id) | 소유자 |
 | product_name | VARCHAR(255) | NOT NULL | 상품명 |
 | product_url | TEXT | NOT NULL | 원본 상품 URL |
+| tracked_product_id | VARCHAR(100) | NULL | 가격 추적용 외부 상품 식별자 |
 | product_image_url | TEXT | NULL | 대표 이미지 URL |
 | memo | VARCHAR(500) | NULL | 사용자 메모 |
 | reference_price | BIGINT | NULL | 자동 조회 기준가 |
@@ -71,6 +73,21 @@
 | metadata | JSON | NULL | 부가 데이터 |
 | created_at | DATETIME | NOT NULL | 생성시각 |
 
+### scheduler_run_history
+| 컬럼명 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, AI | 실행 이력 ID |
+| job_name | VARCHAR(100) | NOT NULL | 스케줄러 작업명 |
+| status | VARCHAR(20) | NOT NULL | SUCCESS/PARTIAL_SUCCESS/FAILED |
+| executed_at | DATETIME | NOT NULL | 실행 시작 시각 |
+| finished_at | DATETIME | NOT NULL | 실행 종료 시각 |
+| scanned_count | INT | NOT NULL | 조회 대상 건수 |
+| success_count | INT | NOT NULL | 성공 처리 건수 |
+| skipped_count | INT | NOT NULL | 스킵 건수 |
+| failed_count | INT | NOT NULL | 실패 건수 |
+| error_message | VARCHAR(1000) | NULL | 실패 메시지 |
+| created_at | DATETIME | NOT NULL | 생성시각 |
+
 ## 2.3 인덱스 설계
 ```sql
 CREATE UNIQUE INDEX ux_users_email ON users (email);
@@ -84,20 +101,25 @@ ON product_wish (status, expire_at);
 CREATE INDEX idx_wish_user_updated
 ON product_wish (user_id, updated_at DESC);
 
+CREATE INDEX idx_product_wish_tracked_product_id
+ON product_wish (tracked_product_id);
+
 CREATE INDEX idx_price_history_wish_changed
 ON price_history (wish_id, changed_at DESC);
 
 CREATE INDEX idx_event_history_wish_event
 ON wish_event_history (wish_id, event_at DESC);
+
+CREATE INDEX idx_scheduler_run_history_job_executed
+ON scheduler_run_history (job_name, executed_at DESC);
 ```
 
 ## 2.4 상태 전이 규칙
 1. 등록: `WAITING` + `lastViewedAt=now` + `expireAt=now+72h`
-2. 조회(상태 WAITING): `lastViewedAt=now`, `expireAt=now+72h`
-3. 조회(상태 EXPIRED): 이벤트 `REACTIVATED` 기록 후 `WAITING` 복귀, `reactivatedCount+1`
-4. 구매: `PURCHASED`
-5. 삭제: `DELETED`
-6. 만료 스케줄: `WAITING` 중 `expireAt <= now`를 `EXPIRED`로 변경, `savedAmount=effectivePrice`
+2. 재활성화: `EXPIRED` -> `WAITING`, `expireAt=now+72h`, `reactivatedCount+1`
+3. 구매: `PURCHASED`
+4. 삭제: `DELETED`
+5. 만료 스케줄: `WAITING` 중 `expireAt <= now`를 `EXPIRED`로 변경, `savedAmount=effectivePrice`
 
 ## 3. API 설계
 
@@ -172,20 +194,19 @@ ON wish_event_history (wish_id, event_at DESC);
 ```json
 {
   "productUrl": "https://smartstore.naver.com/sample/products/123",
+  "trackedProductId": "123", 
   "memo": "이번엔 꼭 3일 고민",
-  "manual": {
-    "productName": "선택 입력",
-    "referencePrice": 129000,
-    "productImageUrl": "https://image.example.com/a.jpg",
-    "userDealPrice": 119000,
-    "dealUrl": "https://instagram.com/...",
-    "dealSourceType": "INFLUENCER"
-  }
+  "productName": "나이키 운동화",
+  "referencePrice": 129000,
+  "productImageUrl": "https://image.example.com/a.jpg",
+  "userDealPrice": 119000,
+  "dealUrl": "https://instagram.com/...",
+  "dealSourceType": "INFLUENCER"
 }
 ```
 - 동작
-- 네이버 API 성공 시 자동값 우선 저장
-- 실패 시 `manual` 필수값 검증 후 수동 저장
+- `trackedProductId`는 URL 파싱값 우선(`id`, `nvMid`, `productNo`, `/item/{id}`, `/catalog/{id}`, `/products/{id}`)
+- URL에서 추출 실패 시 요청 `trackedProductId` 사용
 - Response `201`
 ```json
 {
@@ -201,6 +222,21 @@ ON wish_event_history (wish_id, event_at DESC);
   "expireAt": "2026-05-13T23:00:00+09:00",
   "reactivatedCount": 0
 }
+```
+
+### GET /wishes/search?query=에어팟
+- Response `200`
+```json
+[
+  {
+    "name": "에어팟 프로",
+    "url": "https://shopping.naver.com/item/1",
+    "productId": "1234567890",
+    "imageUrl": "https://img/1.jpg",
+    "referencePrice": 299000,
+    "mallName": "몰A"
+  }
+]
 ```
 
 ### GET /wishes?status=WAITING
@@ -236,21 +272,6 @@ ON wish_event_history (wish_id, event_at DESC);
 }
 ```
 
-### POST /wishes/{id}/view
-- 동작
-- WAITING: `lastViewedAt/expireAt` 연장
-- EXPIRED: `REACTIVATED` 이벤트 + `WAITING` 복귀 + `reactivatedCount+1`
-- Response `200`
-```json
-{
-  "id": 10,
-  "status": "WAITING",
-  "lastViewedAt": "2026-05-11T10:00:00+09:00",
-  "expireAt": "2026-05-14T10:00:00+09:00",
-  "reactivatedCount": 1
-}
-```
-
 ### POST /wishes/{id}/purchase
 - 동작: 상태를 `PURCHASED`로 변경
 - Response `200`
@@ -268,6 +289,16 @@ ON wish_event_history (wish_id, event_at DESC);
 {
   "id": 10,
   "status": "DELETED"
+}
+```
+
+### POST /wishes/{id}/reactivate
+- 동작: `EXPIRED` 상태를 `WAITING`으로 복귀, 만료시각 재설정
+- Response `200`
+```json
+{
+  "id": 10,
+  "status": "WAITING"
 }
 ```
 
@@ -290,12 +321,14 @@ ON wish_event_history (wish_id, event_at DESC);
 ```
 
 ## 3.5 오류 코드 표준
-- `AUTH_REQUIRED` (401)
+- `UNAUTHORIZED` (401)
+- `AUTH_INVALID_CREDENTIALS` (401)
 - `FORBIDDEN_RESOURCE` (403)
-- `VALIDATION_ERROR` (400)
+- `VALIDATION_FAILED` (400)
 - `WISH_NOT_FOUND` (404)
-- `INVALID_STATUS_TRANSITION` (409)
-- `EXTERNAL_API_FAILED` (502)
+- `INVALID_WISH_STATE` (400)
+- `MANUAL_INPUT_REQUIRED` (400)
+- `EMAIL_ALREADY_EXISTS` (409)
 - `INTERNAL_SERVER_ERROR` (500)
 
 ## 3.6 프론트엔드 연동 메모 (Next.js)
@@ -311,14 +344,17 @@ ON wish_event_history (wish_id, event_at DESC);
   - 예: `/sp/wishes` -> `http://localhost:8080/wishes`
 
 ## 4. 스케줄러 설계
-- 만료 판정: `0 */10 * * * *`
-- 가격 갱신: `0 0 */6 * * *`
+- 만료 판정: `${WISH_EXPIRATION_CRON:0 */10 * * * *}`
+- 가격 갱신: `${WISH_PRICE_REFRESH_CRON:0 0 * * * *}`
 - 대상 조회
   - 만료: `status='WAITING' AND expire_at <= now`
   - 가격 갱신: `status IN ('WAITING')`
 - 실패 처리
   - 상품 단위 try/catch
   - 실패 건만 warn 로깅, 배치는 계속
+- 실행 로그 저장
+  - `scheduler_run_history`에 job/status/카운트/에러메시지 저장
+  - 상태값: `SUCCESS`, `PARTIAL_SUCCESS`, `FAILED`
 
 ## 5. 구현 시 검증 체크리스트
 - [ ] 72시간 연장 규칙 테스트

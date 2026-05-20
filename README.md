@@ -10,9 +10,11 @@
 ## MVP 핵심 기능
 - 회원가입/로그인(세션 기반)
 - 상품 URL 등록 + 가격/이미지 자동 조회
+- 동일 상품 식별자(`trackedProductId`) 기반 가격 갱신
 - 자동 조회 실패 시 수동 입력 폴백
 - 72시간 관심 기반 만료 로직
 - 가격 변동 추적 및 이벤트 이력 저장
+- 스케줄러 실행 이력 저장(`scheduler_run_history`)
 - 월별 절약 리포트
 
 ## 프로젝트 구성
@@ -48,6 +50,8 @@ docker compose up -d
 - `REDIS_PORT`
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
+- `WISH_EXPIRATION_CRON` (기본: `0 */10 * * * *`)
+- `WISH_PRICE_REFRESH_CRON` (기본: `0 0 * * * *`)
 
 ### 2) 프론트엔드 실행 (`my-webapp`)
 ```bash
@@ -106,6 +110,12 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - 월간 리포트 캐시 키 형식: `monthlySavings::<userId>:<year>:<month>`
 - 위시 상태 변경(구매/삭제/재활성화), 만료 스케줄 실행 시 캐시 무효화
 - 무효화 시점: 트랜잭션 `afterCommit` (커밋 후 Redis eviction)
+
+## 가격 갱신 정책
+- 갱신 대상: `WAITING` 상태 위시
+- 매칭 기준: `trackedProductId`가 일치하는 상품만 반영
+- 식별자 추출: 등록 시 URL에서 추출 우선(`id`, `nvMid`, `productNo`, `/item/{id}`, `/catalog/{id}`, `/products/{id}`)
+- 정확한 식별자를 못 찾는 경우: 가격 갱신 스킵(오탐 반영 방지)
 
 ## 문서
 - 기획안: [docs/project-plan.md](docs/project-plan.md)

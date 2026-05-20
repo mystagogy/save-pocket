@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# my-webapp
 
-## Getting Started
+작심삼일 긴축재정 프론트엔드(Next.js App Router) 프로젝트입니다.
 
-First, run the development server:
-
+## 실행
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- 기본 주소: `http://localhost:3000`
+- 백엔드 API 프록시: `/sp/*` -> `BACKEND_ORIGIN` (기본 `http://localhost:8080`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 주요 페이지
+- `/login` 로그인
+- `/signup` 회원가입
+- `/wishes/search` 위시 상품 검색
+- `/wishes/new` 위시 등록
+- `/wishes` 위시 목록
+- `/wishes/{id}` 위시 상세
+- `/reports/monthly` 월간 리포트
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 위시 등록 연동 메모
+- 검색 결과에서 등록 이동 시 `trackedProductId`를 함께 전달합니다.
+- 등록 폼 제출(`POST /wishes/create`) 시 `trackedProductId`가 백엔드 `POST /wishes` payload에 포함됩니다.
+- 백엔드가 URL 기반 식별자 파싱을 우선 적용하므로 사용자가 URL을 수정한 경우에도 URL 기준 식별자가 저장됩니다.
