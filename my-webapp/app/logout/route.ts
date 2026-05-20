@@ -20,11 +20,13 @@ async function doLogout(request: Request) {
   const response = NextResponse.redirect(new URL("/login", request.url), 303);
   response.cookies.delete("SESSION");
   response.cookies.delete("JSESSIONID");
+  response.cookies.delete("__Secure-SESSION");
+  response.cookies.delete("__Host-SESSION");
   return response;
 }
 
 export async function GET(request: Request) {
-  return doLogout(request);
+  return NextResponse.redirect(new URL("/", request.url), 303);
 }
 
 export async function POST(request: Request) {

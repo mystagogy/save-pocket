@@ -57,13 +57,15 @@ export default function WishesLayout({
               >
                 위시 리스트
               </Link>
-              <Link
-                id="wishes-logout-button"
-                className="rounded-lg border border-[#d6dcef] bg-white px-3 py-2 text-sm font-medium text-[#39445f] transition hover:bg-[#f5f7fc] disabled:cursor-not-allowed"
-                href="/logout"
-              >
-                로그아웃
-              </Link>
+              <form action="/logout" method="post">
+                <button
+                  id="wishes-logout-button"
+                  type="submit"
+                  className="rounded-lg border border-[#d6dcef] bg-white px-3 py-2 text-sm font-medium text-[#39445f] transition hover:bg-[#f5f7fc] disabled:cursor-not-allowed"
+                >
+                  로그아웃
+                </button>
+              </form>
             </div>
           </div>
         </header>
