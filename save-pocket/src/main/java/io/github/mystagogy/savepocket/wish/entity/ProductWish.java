@@ -34,6 +34,9 @@ public class ProductWish {
     @Column(name = "product_url", nullable = false, columnDefinition = "TEXT")
     private String productUrl;
 
+    @Column(name = "tracked_product_id", length = 100)
+    private String trackedProductId;
+
     @Column(name = "product_image_url", columnDefinition = "TEXT")
     private String productImageUrl;
 
@@ -99,6 +102,10 @@ public class ProductWish {
 
     public String getProductImageUrl() {
         return productImageUrl;
+    }
+
+    public String getTrackedProductId() {
+        return trackedProductId;
     }
 
     public String getMemo() {
@@ -167,6 +174,10 @@ public class ProductWish {
 
     public void setProductUrl(String productUrl) {
         this.productUrl = productUrl;
+    }
+
+    public void setTrackedProductId(String trackedProductId) {
+        this.trackedProductId = trackedProductId;
     }
 
     public void setProductImageUrl(String productImageUrl) {

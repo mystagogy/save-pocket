@@ -60,6 +60,7 @@ public class NaverShoppingSearchHttpClient implements NaverShoppingSearchClient 
                 .map(item -> new NaverShoppingProduct(
                         normalizeText(item.title()),
                         item.link(),
+                        parseProductId(item.productId(), item.link()),
                         item.image(),
                         parsePrice(item.lprice()),
                         item.mallName()
@@ -89,6 +90,34 @@ public class NaverShoppingSearchHttpClient implements NaverShoppingSearchClient 
         }
     }
 
+    private static String parseProductId(String productId, String productLink) {
+        if (StringUtils.hasText(productId)) {
+            return productId.trim();
+        }
+        if (!StringUtils.hasText(productLink)) {
+            return null;
+        }
+
+        String normalized = productLink.replace("&amp;", "&");
+        int queryStart = normalized.indexOf('?');
+        if (queryStart >= 0 && queryStart < normalized.length() - 1) {
+            String query = normalized.substring(queryStart + 1);
+            for (String pair : query.split("&")) {
+                int equalsIndex = pair.indexOf('=');
+                if (equalsIndex <= 0) {
+                    continue;
+                }
+                String key = pair.substring(0, equalsIndex);
+                String value = pair.substring(equalsIndex + 1);
+                if ("id".equalsIgnoreCase(key) || "nvMid".equalsIgnoreCase(key)) {
+                    return value;
+                }
+            }
+        }
+
+        return null;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record NaverShopSearchResponse(List<NaverItem> items) {
     }
@@ -99,6 +128,7 @@ public class NaverShoppingSearchHttpClient implements NaverShoppingSearchClient 
             String link,
             String image,
             String lprice,
+            String productId,
             String mallName
     ) {
     }

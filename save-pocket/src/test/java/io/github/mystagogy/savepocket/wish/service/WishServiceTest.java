@@ -21,6 +21,7 @@ import io.github.mystagogy.savepocket.wish.dto.WishSearchItemResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishStatusUpdateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.entity.DealSourceType;
+import io.github.mystagogy.savepocket.wish.entity.PriceHistory;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishEventHistory;
 import io.github.mystagogy.savepocket.wish.entity.WishEventType;
@@ -83,6 +84,7 @@ class WishServiceTest {
         User user = createUser(1L, "user@example.com");
         WishCreateRequest request = new WishCreateRequest(
                 "https://shopping.naver.com/item/123",
+                "123",
                 "3일 고민",
                 "나이키 운동화",
                 "https://img.naver.com/product.jpg",
@@ -117,8 +119,8 @@ class WishServiceTest {
     @Test
     void searchWishesReturnsMappedSearchItems() {
         when(naverShoppingSearchClient.searchProducts("에어팟")).thenReturn(List.of(
-                new NaverShoppingProduct("에어팟 프로", "https://shopping.naver.com/item/1", "https://img/1.jpg", 299000L, "스마트스토어A"),
-                new NaverShoppingProduct("에어팟 맥스", "https://shopping.naver.com/item/2", "https://img/2.jpg", 699000L, "스마트스토어B")
+                new NaverShoppingProduct("에어팟 프로", "https://shopping.naver.com/item/1", "111", "https://img/1.jpg", 299000L, "스마트스토어A"),
+                new NaverShoppingProduct("에어팟 맥스", "https://shopping.naver.com/item/2", "222", "https://img/2.jpg", 699000L, "스마트스토어B")
         ));
 
         List<WishSearchItemResponse> response = wishService.searchWishes("에어팟");
@@ -363,6 +365,65 @@ class WishServiceTest {
         verify(productWishRepository).findByStatusAndExpireAtLessThanEqual(eq(WishStatus.WAITING), eq(targetTime));
         verify(reportCacheService, never())
                 .evictMonthlySavingsAfterCommit(any(Long.class), any(Integer.class), any(Integer.class));
+    }
+
+    // 기준가 갱신은 상품명 검색이 아니라 trackedProductId 기반으로 동일 상품만 반영해야 한다.
+    @Test
+    void refreshLowestReferencePricesUsesTrackedProductId() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductName("원래 상품명");
+        wish.setProductUrl("https://search.shopping.naver.com/gate.nhn?id=456");
+        wish.setTrackedProductId("456");
+        wish.setReferencePrice(120000L);
+
+        when(productWishRepository.findByStatus(WishStatus.WAITING)).thenReturn(List.of(wish));
+        when(naverShoppingSearchClient.searchProducts("456")).thenReturn(List.of(
+                new NaverShoppingProduct("동일 상품", "https://search.shopping.naver.com/gate.nhn?id=456", "456", "https://img/1.jpg", 99000L, "몰A"),
+                new NaverShoppingProduct("다른 상품", "https://search.shopping.naver.com/gate.nhn?id=999", "999", "https://img/2.jpg", 88000L, "몰B")
+        ));
+
+        WishService.PriceRefreshResult result = wishService.refreshLowestReferencePrices(targetTime);
+
+        assertThat(result.scannedCount()).isEqualTo(1);
+        assertThat(result.updatedCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(0);
+        assertThat(result.failedCount()).isEqualTo(0);
+        assertThat(wish.getReferencePrice()).isEqualTo(99000L);
+
+        verify(naverShoppingSearchClient).searchProducts("456");
+
+        ArgumentCaptor<PriceHistory> priceHistoryCaptor = ArgumentCaptor.forClass(PriceHistory.class);
+        verify(priceHistoryRepository).save(priceHistoryCaptor.capture());
+        assertThat(priceHistoryCaptor.getValue().getPreviousPrice()).isEqualTo(120000L);
+        assertThat(priceHistoryCaptor.getValue().getChangedPrice()).isEqualTo(99000L);
+
+        ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
+        verify(wishEventHistoryRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.PRICE_CHANGED);
+    }
+
+    // trackedProductId를 찾을 수 없으면 정확도 보장을 위해 가격 갱신을 건너뛰어야 한다.
+    @Test
+    void refreshLowestReferencePricesSkipsWhenTrackedProductIdMissing() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductName("원래 상품명");
+        wish.setProductUrl("https://example.com/product/abc");
+        wish.setReferencePrice(120000L);
+
+        when(productWishRepository.findByStatus(WishStatus.WAITING)).thenReturn(List.of(wish));
+
+        WishService.PriceRefreshResult result = wishService.refreshLowestReferencePrices(targetTime);
+
+        assertThat(result.scannedCount()).isEqualTo(1);
+        assertThat(result.updatedCount()).isEqualTo(0);
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(naverShoppingSearchClient, never()).searchProducts(any(String.class));
+        verify(priceHistoryRepository, never()).save(any(PriceHistory.class));
     }
 
     private User createUser(Long id, String email) {

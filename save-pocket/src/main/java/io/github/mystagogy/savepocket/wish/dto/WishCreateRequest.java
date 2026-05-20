@@ -9,6 +9,9 @@ public record WishCreateRequest(
         @NotBlank(message = "상품 URL은 필수입니다.")
         String productUrl,
 
+        @Size(max = 100, message = "상품 식별자는 100자 이하여야 합니다.")
+        String trackedProductId,
+
         @Size(max = 500, message = "메모는 500자 이하여야 합니다.")
         String memo,
 

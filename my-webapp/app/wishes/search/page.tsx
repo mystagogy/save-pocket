@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { ApiRequestError, searchWishProducts } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { WishSearchItemResponse } from "@/lib/types";
@@ -26,6 +26,10 @@ function buildPrefillLink(item: WishSearchItemResponse): string {
     productName: item.name,
   });
 
+  if (item.productId) {
+    params.set("trackedProductId", item.productId);
+  }
+
   if (item.imageUrl) {
     params.set("productImageUrl", item.imageUrl);
   }
@@ -42,10 +46,6 @@ export default function WishSearchPage() {
   const [items, setItems] = useState<WishSearchItemResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    (window as typeof window & { __spWishSearchHydrated?: boolean }).__spWishSearchHydrated = true;
-  }, []);
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -74,8 +74,7 @@ export default function WishSearchPage() {
   };
 
   return (
-    <>
-    <div id="wish-search-react-root" className="space-y-4">
+    <div className="space-y-4">
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">위시 상품 검색</h2>
@@ -169,157 +168,5 @@ export default function WishSearchPage() {
         </section>
       )}
     </div>
-    <div id="wish-search-fallback-root" className="hidden" />
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-          (function () {
-            function escapeHtml(text) {
-              return String(text)
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;");
-            }
-
-            function formatCurrency(value) {
-              if (value === null || value === undefined) return "-";
-              return Number(value).toLocaleString("ko-KR") + "원";
-            }
-
-            function buildPrefillLink(item) {
-              var params = new URLSearchParams({
-                productUrl: item.url || "",
-                productName: item.name || ""
-              });
-              if (item.imageUrl) params.set("productImageUrl", item.imageUrl);
-              if (item.referencePrice !== null && item.referencePrice !== undefined) {
-                params.set("referencePrice", String(item.referencePrice));
-              }
-              return "/wishes/new?" + params.toString();
-            }
-
-            function renderBase(root, loading) {
-              root.innerHTML =
-                '<section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">' +
-                '<div class="flex items-center justify-between gap-3">' +
-                '<h2 class="text-xl font-semibold">위시 상품 검색</h2>' +
-                '<a href="/wishes/new" class="min-w-20 whitespace-nowrap rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-center text-sm font-semibold !text-white">수동 등록</a>' +
-                '</div>' +
-                '<form id="wish-search-fallback-form" class="mt-5 flex flex-col gap-3 sm:flex-row">' +
-                '<input id="wish-search-fallback-input" type="text" placeholder="예: 나이키 운동화" class="w-full rounded-xl border border-[#d5dceb] bg-white px-3 py-2.5 text-sm outline-none" />' +
-                '<button id="wish-search-fallback-submit" type="submit" class="min-w-20 whitespace-nowrap rounded-xl bg-[#1d4ed8] px-4 py-2.5 text-sm font-semibold text-white">' +
-                (loading ? "검색 중..." : "검색") +
-                '</button>' +
-                '</form>' +
-                '<p id="wish-search-fallback-error" class="mt-4 hidden rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]"></p>' +
-                '</section>' +
-                '<section id="wish-search-fallback-results" class="grid grid-cols-1 gap-4 md:grid-cols-2"></section>';
-            }
-
-            function showError(message) {
-              var error = document.getElementById("wish-search-fallback-error");
-              if (error instanceof HTMLElement) {
-                error.textContent = message;
-                error.classList.remove("hidden");
-              }
-            }
-
-            function clearError() {
-              var error = document.getElementById("wish-search-fallback-error");
-              if (error instanceof HTMLElement) {
-                error.textContent = "";
-                error.classList.add("hidden");
-              }
-            }
-
-            function renderResults(items) {
-              var target = document.getElementById("wish-search-fallback-results");
-              if (!(target instanceof HTMLElement)) return;
-              if (!Array.isArray(items) || items.length === 0) {
-                target.innerHTML = "";
-                return;
-              }
-
-              target.innerHTML = items.map(function (item, index) {
-                var href = buildPrefillLink(item);
-                return (
-                  '<article key="' + index + '" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">' +
-                  '<p class="text-xs font-medium text-[#4b556d]">' + escapeHtml(item.mallName || "몰 정보 없음") + '</p>' +
-                  '<h3 class="mt-1 line-clamp-2 text-lg font-semibold">' + escapeHtml(item.name || "") + '</h3>' +
-                  '<p class="mt-2 text-sm text-[#1f2a44]">기준 가격: <span class="font-semibold">' + escapeHtml(formatCurrency(item.referencePrice)) + '</span></p>' +
-                  '<div class="mt-4 flex flex-wrap gap-2">' +
-                  '<a href="' + escapeHtml(item.url || "#") + '" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium text-[#1f2a44]">사이트로 이동</a>' +
-                  '<a href="' + href + '" class="rounded-lg bg-[#1d4ed8] px-3 py-2 text-sm font-medium text-white">이 상품으로 등록</a>' +
-                  '</div>' +
-                  '</article>'
-                );
-              }).join("");
-            }
-
-            function bindSearch(root) {
-              var form = document.getElementById("wish-search-fallback-form");
-              var input = document.getElementById("wish-search-fallback-input");
-              if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) return;
-
-              form.addEventListener("submit", async function (event) {
-                event.preventDefault();
-                clearError();
-                var query = input.value.trim();
-                if (!query) {
-                  showError("검색어를 입력해주세요.");
-                  return;
-                }
-
-                renderBase(root, true);
-                var newInput = document.getElementById("wish-search-fallback-input");
-                if (newInput instanceof HTMLInputElement) {
-                  newInput.value = query;
-                }
-                bindSearch(root);
-                try {
-                  var response = await fetch("/sp/wishes/search?query=" + encodeURIComponent(query), {
-                    method: "GET",
-                    headers: { Accept: "application/json" },
-                    credentials: "include",
-                    cache: "no-store"
-                  });
-                  var text = await response.text();
-                  var payload = text ? JSON.parse(text) : null;
-                  if (!response.ok || !payload || !payload.success || !Array.isArray(payload.data)) {
-                    showError("검색 중 오류가 발생했습니다.");
-                    return;
-                  }
-                  renderResults(payload.data);
-                } catch (_) {
-                  showError("네트워크 오류로 검색에 실패했습니다.");
-                }
-              });
-            }
-
-            function activateFallback() {
-              if (window.__spWishSearchHydrated) return;
-              var reactRoot = document.getElementById("wish-search-react-root");
-              var fallbackRoot = document.getElementById("wish-search-fallback-root");
-              if (!(reactRoot instanceof HTMLElement) || !(fallbackRoot instanceof HTMLElement)) return;
-
-              reactRoot.classList.add("hidden");
-              fallbackRoot.classList.remove("hidden");
-              renderBase(fallbackRoot, false);
-              bindSearch(fallbackRoot);
-            }
-
-            if (document.readyState === "loading") {
-              document.addEventListener("DOMContentLoaded", function () {
-                setTimeout(activateFallback, 600);
-              });
-            } else {
-              setTimeout(activateFallback, 600);
-            }
-          })();
-        `,
-      }}
-    />
-    </>
   );
 }

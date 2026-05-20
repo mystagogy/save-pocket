@@ -125,8 +125,8 @@ class WishControllerIntegrationTest {
     void searchWishesReturnsNaverResultList() throws Exception {
         org.springframework.mock.web.MockHttpSession session = loginSession("user1@example.com", "Password123!");
         when(naverShoppingSearchClient.searchProducts("에어팟")).thenReturn(java.util.List.of(
-                new NaverShoppingProduct("에어팟 프로", "https://shopping.naver.com/item/1", "https://img/1.jpg", 299000L, "몰A"),
-                new NaverShoppingProduct("에어팟 맥스", "https://shopping.naver.com/item/2", "https://img/2.jpg", 699000L, "몰B")
+                new NaverShoppingProduct("에어팟 프로", "https://shopping.naver.com/item/1", "111", "https://img/1.jpg", 299000L, "몰A"),
+                new NaverShoppingProduct("에어팟 맥스", "https://shopping.naver.com/item/2", "222", "https://img/2.jpg", 699000L, "몰B")
         ));
 
         mockMvc.perform(get("/wishes/search")

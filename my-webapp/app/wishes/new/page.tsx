@@ -25,6 +25,7 @@ export default async function WishCreatePage({
   const params = await searchParams;
 
   const productUrl = readValue(params, "productUrl");
+  const trackedProductId = readValue(params, "trackedProductId");
   const productName = readValue(params, "productName");
   const productImageUrl = readValue(params, "productImageUrl");
   const referencePrice = readValue(params, "referencePrice");
@@ -52,6 +53,8 @@ export default async function WishCreatePage({
             placeholder="https://..."
           />
         </label>
+
+        <input type="hidden" name="trackedProductId" defaultValue={trackedProductId} />
 
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium">상품명 *</span>
