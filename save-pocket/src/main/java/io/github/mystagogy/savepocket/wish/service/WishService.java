@@ -410,10 +410,15 @@ public class WishService {
     }
 
     private String resolveTrackedProductId(String requestTrackedProductId, String productUrl) {
+        String urlDerivedProductId = extractProductIdFromUrl(productUrl);
+        if (StringUtils.hasText(urlDerivedProductId)) {
+            return urlDerivedProductId;
+        }
+
         if (StringUtils.hasText(requestTrackedProductId)) {
             return requestTrackedProductId.trim();
         }
-        return extractProductIdFromUrl(productUrl);
+        return null;
     }
 
     private boolean isTrackedProductMatched(NaverShoppingProduct product, String trackedProductId) {
@@ -482,7 +487,9 @@ public class WishService {
         String[] tokens = path.split("/");
         for (int i = 0; i < tokens.length - 1; i++) {
             String token = tokens[i];
-            if (!"catalog".equalsIgnoreCase(token) && !"products".equalsIgnoreCase(token)) {
+            if (!"catalog".equalsIgnoreCase(token)
+                    && !"products".equalsIgnoreCase(token)
+                    && !"item".equalsIgnoreCase(token)) {
                 continue;
             }
             String candidate = tokens[i + 1].trim();

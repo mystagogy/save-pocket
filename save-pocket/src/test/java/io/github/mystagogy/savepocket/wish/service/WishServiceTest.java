@@ -115,6 +115,32 @@ class WishServiceTest {
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.REGISTERED);
     }
 
+    // 등록 시 URL에서 상품 식별자를 추출할 수 있으면 요청 trackedProductId보다 URL 추출값을 우선 사용해야 한다.
+    @Test
+    void createWishPrefersProductIdDerivedFromUrl() {
+        User user = createUser(1L, "user@example.com");
+        WishCreateRequest request = new WishCreateRequest(
+                "https://shopping.naver.com/item/12345",
+                "99999",
+                "메모",
+                "상품",
+                null,
+                10000L,
+                null,
+                null,
+                null
+        );
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(productWishRepository.save(any(ProductWish.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        wishService.createWish(1L, request);
+
+        ArgumentCaptor<ProductWish> wishCaptor = ArgumentCaptor.forClass(ProductWish.class);
+        verify(productWishRepository).save(wishCaptor.capture());
+        assertThat(wishCaptor.getValue().getTrackedProductId()).isEqualTo("12345");
+    }
+
     // 검색어로 조회하면 네이버 검색 결과 목록을 응답 DTO 리스트로 반환해야 한다.
     @Test
     void searchWishesReturnsMappedSearchItems() {
@@ -424,6 +450,27 @@ class WishServiceTest {
         assertThat(result.failedCount()).isEqualTo(0);
         verify(naverShoppingSearchClient, never()).searchProducts(any(String.class));
         verify(priceHistoryRepository, never()).save(any(PriceHistory.class));
+    }
+
+    // 기존 item 경로 URL에서도 상품 식별자를 추출해 가격 갱신 대상에 포함해야 한다.
+    @Test
+    void refreshLowestReferencePricesParsesLegacyItemUrl() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductUrl("https://shopping.naver.com/item/456");
+        wish.setReferencePrice(120000L);
+
+        when(productWishRepository.findByStatus(WishStatus.WAITING)).thenReturn(List.of(wish));
+        when(naverShoppingSearchClient.searchProducts("456")).thenReturn(List.of(
+                new NaverShoppingProduct("동일 상품", "https://shopping.naver.com/item/456", null, "https://img/1.jpg", 100000L, "몰A")
+        ));
+
+        WishService.PriceRefreshResult result = wishService.refreshLowestReferencePrices(targetTime);
+
+        assertThat(result.updatedCount()).isEqualTo(1);
+        verify(naverShoppingSearchClient).searchProducts("456");
+        assertThat(wish.getTrackedProductId()).isEqualTo("456");
     }
 
     private User createUser(Long id, String email) {
