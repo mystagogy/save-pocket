@@ -6,6 +6,7 @@ import io.github.mystagogy.savepocket.auth.dto.SignupRequest;
 import io.github.mystagogy.savepocket.auth.service.AuthService;
 import io.github.mystagogy.savepocket.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,9 +35,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthUserResponse>> login(
             @Valid @RequestBody LoginRequest request,
-            HttpServletRequest servletRequest
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
     ) {
-        AuthUserResponse user = authService.login(request, servletRequest);
+        AuthUserResponse user = authService.login(request, servletRequest, servletResponse);
         return ResponseEntity.ok(ApiResponse.success(user));
     }
 
