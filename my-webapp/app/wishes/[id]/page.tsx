@@ -15,8 +15,17 @@ import { formatCurrency, formatDateTime, statusToLabel } from "@/lib/format";
 import { WishDetailResponse } from "@/lib/types";
 
 function getSafeExternalUrl(rawUrl: string): string | null {
+  const normalized = rawUrl.replaceAll("&amp;", "&").trim();
+  const withProtocol =
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("//")
+      ? normalized
+      : `https://${normalized}`;
+  const finalUrl = withProtocol.startsWith("//") ? `https:${withProtocol}` : withProtocol;
+
   try {
-    const parsed = new URL(rawUrl);
+    const parsed = new URL(finalUrl);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return null;
     }
@@ -217,7 +226,6 @@ export default function WishDetailPage() {
             {safeProductUrl && (
               <a
                 href={safeProductUrl}
-                target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center rounded-lg border border-[#cfd8ee] bg-white px-3 py-1.5 text-xs font-semibold text-[#2c426f] transition hover:bg-[#eef3ff]"
               >
