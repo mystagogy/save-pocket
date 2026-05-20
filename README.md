@@ -60,6 +60,12 @@ npm install
 npm run dev
 ```
 
+배포된 백엔드(Railway)와 로컬 프론트를 바로 연동해 테스트하려면:
+```bash
+cd my-webapp
+npm run dev:remote
+```
+
 기본 접속:
 - 프론트: `http://localhost:3000`
 - 백엔드: `http://localhost:8080`

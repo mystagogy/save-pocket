@@ -23,10 +23,6 @@ export default function MonthlyReportPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (window as typeof window & { __spMonthlyHydrated?: boolean }).__spMonthlyHydrated = true;
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
@@ -215,114 +211,7 @@ export default function MonthlyReportPage() {
           )}
         </div>
 
-        <div id="monthly-fallback-root" className="hidden" />
       </section>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function () {
-              function formatCurrency(value) {
-                if (value === null || value === undefined) return "-";
-                return Number(value).toLocaleString("ko-KR") + "원";
-              }
-
-              function formatSignedCurrency(value) {
-                var n = Number(value || 0);
-                var abs = formatCurrency(Math.abs(n));
-                if (n > 0) return "+" + abs;
-                if (n < 0) return "-" + abs;
-                return abs;
-              }
-
-              function escapeHtml(text) {
-                return String(text)
-                  .replaceAll("&", "&amp;")
-                  .replaceAll("<", "&lt;")
-                  .replaceAll(">", "&gt;")
-                  .replaceAll('"', "&quot;");
-              }
-
-              async function activateFallback() {
-                if (window.__spMonthlyHydrated) return;
-
-                var reactDynamic = document.getElementById("monthly-react-dynamic");
-                var root = document.getElementById("monthly-fallback-root");
-                if (!(reactDynamic instanceof HTMLElement) || !(root instanceof HTMLElement)) return;
-
-                reactDynamic.classList.add("hidden");
-                root.classList.remove("hidden");
-                root.innerHTML = '<p class="mt-5 rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#4b556d]">모바일 호환 모드에서 불러오는 중...</p>';
-
-                try {
-                  var response = await fetch("/sp/reports/monthly", {
-                    method: "GET",
-                    headers: { Accept: "application/json" },
-                    credentials: "include",
-                    cache: "no-store"
-                  });
-                  var text = await response.text();
-                  var payload = text ? JSON.parse(text) : null;
-                  if (!response.ok || !payload || !payload.success || !payload.data) {
-                    root.innerHTML = '<p class="mt-5 rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">월 리포트를 불러오지 못했습니다.</p>';
-                    return;
-                  }
-
-                  var data = payload.data;
-                  var amount = Number(data.netSavedAmount || 0);
-                  var amountClass = amount > 0 ? "text-[#dc2626]" : amount < 0 ? "text-[#2563eb]" : "text-[#1f2937]";
-
-                  var details = Array.isArray(data.details) ? data.details : [];
-                  var detailHtml = "";
-                  if (details.length > 0) {
-                    detailHtml =
-                      '<ul class="mt-3 divide-y divide-[#e5eaf4] rounded-xl border border-[#e5eaf4] bg-white">' +
-                      details.map(function (item) {
-                        var signed = Number(item.signedAmount || 0);
-                        var amountColor = signed > 0 ? "text-[#dc2626]" : "text-[#2563eb]";
-                        var label = item.status === "EXPIRED" ? "만료(+)" : "구매(-)";
-                        return (
-                          '<li>' +
-                          '<a href="/wishes/' + item.wishId + '" class="flex items-center justify-between gap-4 px-4 py-3">' +
-                          '<div class="min-w-0">' +
-                          '<p class="truncate text-sm font-medium text-[#1f2a44]">' + escapeHtml(item.wishName) + '</p>' +
-                          '<p class="mt-0.5 text-xs text-[#6b7280]">' + label + '</p>' +
-                          '</div>' +
-                          '<p class="shrink-0 text-sm font-semibold ' + amountColor + '">' + formatSignedCurrency(signed) + '</p>' +
-                          '</a>' +
-                          '</li>'
-                        );
-                      }).join("") +
-                      '</ul>';
-                  } else {
-                    detailHtml = '<p class="mt-3 rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#4b556d]">이번 달 상세 내역이 없습니다.</p>';
-                  }
-
-                  root.innerHTML =
-                    '<div class="mt-5 rounded-2xl bg-[#f8fafc] px-5 py-6 ring-1 ring-black/5">' +
-                    '<p class="text-sm text-[#4b556d]">이번 달 총합</p>' +
-                    '<p class="mt-2 text-4xl font-bold tracking-tight ' + amountClass + '">' + formatSignedCurrency(amount) + '</p>' +
-                    '</div>' +
-                    '<section class="mt-6">' +
-                    '<h3 class="text-base font-semibold">상세 내역</h3>' +
-                    detailHtml +
-                    '</section>';
-                } catch (_) {
-                  root.innerHTML = '<p class="mt-5 rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">네트워크 오류로 월 리포트를 불러오지 못했습니다.</p>';
-                }
-              }
-
-              if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", function () {
-                  setTimeout(activateFallback, 600);
-                });
-              } else {
-                setTimeout(activateFallback, 600);
-              }
-            })();
-          `,
-        }}
-      />
     </main>
   );
 }

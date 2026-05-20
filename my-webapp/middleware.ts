@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const LOGIN_PATH = "/login";
-const SESSION_COOKIE_NAMES = ["SESSION", "JSESSIONID"] as const;
+const SESSION_COOKIE_NAMES = [
+  "SESSION",
+  "JSESSIONID",
+  "__Secure-SESSION",
+  "__Host-SESSION",
+] as const;
 
 export function middleware(request: NextRequest) {
   const session = SESSION_COOKIE_NAMES
