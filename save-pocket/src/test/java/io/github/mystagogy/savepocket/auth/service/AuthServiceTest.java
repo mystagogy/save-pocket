@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -50,11 +51,12 @@ class AuthServiceTest {
         User user = createUser(1L, "user@example.com", "encoded-password", "절약러");
         LoginRequest request = new LoginRequest("user@example.com", "Password123!");
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123!", "encoded-password")).thenReturn(true);
 
-        AuthUserResponse response = authService.login(request, servletRequest);
+        AuthUserResponse response = authService.login(request, servletRequest, servletResponse);
 
         assertThat(response.id()).isEqualTo(1L);
         assertThat(response.email()).isEqualTo("user@example.com");
@@ -72,10 +74,11 @@ class AuthServiceTest {
     void loginFailsWhenUserNotFound() {
         LoginRequest request = new LoginRequest("missing@example.com", "Password123!");
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(request, servletRequest))
+        assertThatThrownBy(() -> authService.login(request, servletRequest, servletResponse))
                 .isInstanceOf(SavePocketException.class)
                 .extracting(ex -> ((SavePocketException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AUTH_INVALID_CREDENTIALS);
@@ -89,11 +92,12 @@ class AuthServiceTest {
         User user = createUser(1L, "user@example.com", "encoded-password", "절약러");
         LoginRequest request = new LoginRequest("user@example.com", "WrongPassword123!");
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("WrongPassword123!", "encoded-password")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(request, servletRequest))
+        assertThatThrownBy(() -> authService.login(request, servletRequest, servletResponse))
                 .isInstanceOf(SavePocketException.class)
                 .extracting(ex -> ((SavePocketException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AUTH_INVALID_CREDENTIALS);

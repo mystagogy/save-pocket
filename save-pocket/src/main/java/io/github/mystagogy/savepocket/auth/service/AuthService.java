@@ -9,12 +9,14 @@ import io.github.mystagogy.savepocket.auth.session.AuthSessionConstants;
 import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,13 +25,18 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    public AuthUserResponse login(LoginRequest request, HttpServletRequest servletRequest) {
+    public AuthUserResponse login(
+            LoginRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new SavePocketException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
@@ -48,7 +55,7 @@ public class AuthService {
                 Collections.emptyList()
         ));
         SecurityContextHolder.setContext(context);
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+        securityContextRepository.saveContext(context, servletRequest, servletResponse);
 
         return new AuthUserResponse(user.getId(), user.getEmail(), user.getNickname());
     }
