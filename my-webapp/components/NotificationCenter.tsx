@@ -23,31 +23,74 @@ export default function NotificationCenter() {
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<number | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const stopReconnectRef = useRef(false);
+  const unmountedRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const response = await getNotifications(MAX_ITEMS);
-        if (!cancelled) {
-          setItems(response.items);
-          setUnreadCount(response.unreadCount);
-        }
-      } catch (err) {
-        if (!cancelled && err instanceof ApiRequestError) {
-          setError(err.message);
+  const loadNotifications = async (): Promise<boolean> => {
+    try {
+      const response = await getNotifications(MAX_ITEMS);
+      if (unmountedRef.current) {
+        return false;
+      }
+      setItems(response.items);
+      setUnreadCount(response.unreadCount);
+      setError(null);
+      return true;
+    } catch (err) {
+      if (!unmountedRef.current && err instanceof ApiRequestError) {
+        setError(err.message);
+        if (err.status === 401 || err.code === "UNAUTHORIZED") {
+          stopReconnectRef.current = true;
         }
       }
-    };
+      return false;
+    }
+  };
 
-    void load();
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
     return () => {
-      cancelled = true;
+      window.clearTimeout(timerId);
+      unmountedRef.current = true;
     };
   }, []);
 
   useEffect(() => {
+    const scheduleReconnect = () => {
+      if (stopReconnectRef.current || unmountedRef.current) {
+        return;
+      }
+
+      retryCountRef.current += 1;
+      const delay = Math.min(
+        BASE_RETRY_DELAY_MS * 2 ** Math.max(retryCountRef.current - 1, 0),
+        MAX_RETRY_DELAY_MS,
+      );
+
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+      }
+
+      retryTimerRef.current = window.setTimeout(() => {
+        if (!stopReconnectRef.current && !unmountedRef.current) {
+          connect();
+        }
+      }, delay);
+    };
+
+    const handleStreamError = async () => {
+      // 끊긴 동안 유실된 알림을 재동기화하고, 인증 만료 시 재연결을 중단한다.
+      await loadNotifications();
+      scheduleReconnect();
+    };
+
     const connect = () => {
+      if (stopReconnectRef.current || unmountedRef.current) {
+        return;
+      }
+
       const eventSource = new EventSource("/sp/notifications/stream", {
         withCredentials: true,
       });
@@ -55,6 +98,7 @@ export default function NotificationCenter() {
 
       eventSource.addEventListener("connected", () => {
         retryCountRef.current = 0;
+        void loadNotifications();
       });
 
       eventSource.addEventListener("notification", (event) => {
@@ -77,29 +121,14 @@ export default function NotificationCenter() {
 
       eventSource.onerror = () => {
         eventSource.close();
-        scheduleReconnect();
+        void handleStreamError();
       };
-    };
-
-    const scheduleReconnect = () => {
-      retryCountRef.current += 1;
-      const delay = Math.min(
-        BASE_RETRY_DELAY_MS * 2 ** Math.max(retryCountRef.current - 1, 0),
-        MAX_RETRY_DELAY_MS,
-      );
-
-      if (retryTimerRef.current !== null) {
-        window.clearTimeout(retryTimerRef.current);
-      }
-
-      retryTimerRef.current = window.setTimeout(() => {
-        connect();
-      }, delay);
     };
 
     connect();
 
     return () => {
+      unmountedRef.current = true;
       if (retryTimerRef.current !== null) {
         window.clearTimeout(retryTimerRef.current);
       }
