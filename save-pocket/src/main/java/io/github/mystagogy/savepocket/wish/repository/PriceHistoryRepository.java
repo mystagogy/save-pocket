@@ -1,6 +1,7 @@
 package io.github.mystagogy.savepocket.wish.repository;
 
 import io.github.mystagogy.savepocket.wish.entity.PriceHistory;
+import io.github.mystagogy.savepocket.wish.entity.PriceType;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,5 +23,16 @@ public interface PriceHistoryRepository extends JpaRepository<PriceHistory, Long
             @Param("userId") Long userId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+            select min(ph.changedPrice)
+            from PriceHistory ph
+            where ph.wish.id = :wishId
+              and ph.priceType = :priceType
+            """)
+    Long findMinChangedPriceByWishIdAndPriceType(
+            @Param("wishId") Long wishId,
+            @Param("priceType") PriceType priceType
     );
 }
