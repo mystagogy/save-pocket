@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
+import java.util.Locale;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,7 +38,8 @@ public class AuthService {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
-        User user = userRepository.findByEmail(request.email())
+        String normalizedEmail = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new SavePocketException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -61,12 +63,14 @@ public class AuthService {
     }
 
     public AuthUserResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        String normalizedEmail = normalizeEmail(request.email());
+
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new SavePocketException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         User user = new User();
-        user.setEmail(request.email());
+        user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setNickname(request.nickname());
 
@@ -98,5 +102,9 @@ public class AuthService {
 
         session.invalidate();
         SecurityContextHolder.clearContext();
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

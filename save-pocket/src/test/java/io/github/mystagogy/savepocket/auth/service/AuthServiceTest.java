@@ -53,7 +53,7 @@ class AuthServiceTest {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123!", "encoded-password")).thenReturn(true);
 
         AuthUserResponse response = authService.login(request, servletRequest, servletResponse);
@@ -76,7 +76,7 @@ class AuthServiceTest {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
-        when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(request, servletRequest, servletResponse))
                 .isInstanceOf(SavePocketException.class)
@@ -94,7 +94,7 @@ class AuthServiceTest {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("WrongPassword123!", "encoded-password")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(request, servletRequest, servletResponse))
@@ -109,7 +109,7 @@ class AuthServiceTest {
         SignupRequest request = new SignupRequest("new@example.com", "Password123!", "신규유저");
         User savedUser = createUser(10L, "new@example.com", "encoded-password", "신규유저");
 
-        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
         when(passwordEncoder.encode("Password123!")).thenReturn("encoded-password");
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
@@ -126,7 +126,7 @@ class AuthServiceTest {
     void signupFailsWhenEmailAlreadyExists() {
         SignupRequest request = new SignupRequest("user@example.com", "Password123!", "절약러");
 
-        when(userRepository.existsByEmail("user@example.com")).thenReturn(true);
+        when(userRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.signup(request))
                 .isInstanceOf(SavePocketException.class)
@@ -135,6 +135,37 @@ class AuthServiceTest {
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    // 이메일 대소문자가 달라도 로그인에 성공해야 한다.
+    @Test
+    void loginSuccessWhenEmailHasDifferentCase() {
+        User user = createUser(1L, "user@example.com", "encoded-password", "절약러");
+        LoginRequest request = new LoginRequest("User@Example.Com", "Password123!");
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123!", "encoded-password")).thenReturn(true);
+
+        AuthUserResponse response = authService.login(request, servletRequest, servletResponse);
+
+        assertThat(response.email()).isEqualTo("user@example.com");
+    }
+
+    // 회원가입 시 이메일을 소문자로 정규화해 저장해야 한다.
+    @Test
+    void signupNormalizesEmailToLowercase() {
+        SignupRequest request = new SignupRequest("New@Example.Com", "Password123!", "신규유저");
+        User savedUser = createUser(10L, "new@example.com", "encoded-password", "신규유저");
+
+        when(userRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("Password123!")).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+        AuthUserResponse response = authService.signup(request);
+
+        assertThat(response.email()).isEqualTo("new@example.com");
     }
 
     // 로그인된 세션으로 로그아웃하면 세션이 무효화되어야 한다.

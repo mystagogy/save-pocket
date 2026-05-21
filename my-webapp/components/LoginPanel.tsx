@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
-import { ApiRequestError, login } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { ApiRequestError, clearAuthClientHints, login } from "@/lib/api";
 
 export default function LoginPanel() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +15,18 @@ export default function LoginPanel() {
   const redirectParam = searchParams.get("redirect");
   const redirectTarget = sanitizeRedirectPath(redirectParam);
 
+  useEffect(() => {
+    if (reason === "required") {
+      window.alert("로그인이 필요합니다.");
+      clearAuthClientHints();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("reason");
+      const nextQuery = params.toString();
+      const nextUrl = nextQuery ? `/login?${nextQuery}` : "/login";
+      window.history.replaceState({}, "", nextUrl);
+    }
+  }, [reason, searchParams]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
@@ -23,8 +34,7 @@ export default function LoginPanel() {
 
     try {
       await login({ email, password });
-      router.push(redirectTarget);
-      router.refresh();
+      window.location.assign(redirectTarget);
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);

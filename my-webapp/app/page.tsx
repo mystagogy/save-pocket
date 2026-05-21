@@ -21,7 +21,6 @@ export default function HomePage() {
   const [summary, setSummary] = useState<MonthlySavingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [needLogin, setNeedLogin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,21 +28,16 @@ export default function HomePage() {
     const load = async () => {
       setLoading(true);
       setError(null);
-      setNeedLogin(false);
 
       try {
-        const response = await getMonthlySavings({ redirectOnUnauthorized: false });
+        const response = await getMonthlySavings();
         if (!cancelled) {
           setSummary(response);
         }
       } catch (err) {
         if (!cancelled) {
           if (err instanceof ApiRequestError) {
-            if (err.status === 401 || err.code === "UNAUTHORIZED") {
-              setNeedLogin(true);
-            } else {
-              setError(err.message);
-            }
+            setError(err.message);
           } else {
             setError("메인 리포트를 불러오지 못했습니다.");
           }
@@ -73,16 +67,27 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/wishes/search"
+              prefetch={false}
               className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
             >
               위시 상품 검색
             </Link>
             <Link
               href="/wishes"
+              prefetch={false}
               className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
             >
               위시 리스트
             </Link>
+            <form action="/logout" method="post">
+              <button
+                id="home-logout-button"
+                type="submit"
+                className="rounded-lg border border-[#d6dcef] bg-white px-3 py-2 text-sm font-medium text-[#39445f] transition hover:bg-[#f5f7fc] disabled:cursor-not-allowed"
+              >
+                로그아웃
+              </button>
+            </form>
           </div>
         </div>
       </header>
@@ -92,6 +97,7 @@ export default function HomePage() {
           <h2 className="text-4xl font-semibold">이번 달 절약 리포트</h2>
           <Link
             href="/reports/monthly"
+            prefetch={false}
             aria-label="상세 리포트로 이동"
             title="상세 리포트"
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
@@ -115,13 +121,6 @@ export default function HomePage() {
 
         {loading ? (
           <p className="mt-5 rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#4b556d]">불러오는 중...</p>
-        ) : needLogin ? (
-          <p className="mt-5 rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#4b556d]">
-            로그인 후 메인 리포트를 확인할 수 있습니다.{" "}
-            <Link href="/login" className="font-semibold text-[#1d4ed8] underline">
-              로그인으로 이동
-            </Link>
-          </p>
         ) : error ? (
           <p className="mt-5 rounded-xl bg-[#ffe9e9] px-3 py-2 text-sm text-[#b71d1d]">{error}</p>
         ) : (

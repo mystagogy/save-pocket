@@ -26,5 +26,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/wishes/:path*", "/reports/:path*"],
+  matcher: [
+    "/((?!login|signup|logout|sp|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+  ],
 };

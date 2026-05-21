@@ -90,6 +90,21 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("EMAIL_ALREADY_EXISTS"));
     }
 
+    // 대소문자만 다른 동일 이메일로 회원가입하면 409 중복 이메일 응답을 반환해야 한다.
+    @Test
+    void signupReturns409WhenEmailAlreadyExistsIgnoringCase() throws Exception {
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("email", "User@Example.com", "password", "Password123!", "nickname", "중복유저")
+        );
+
+        mockMvc.perform(post("/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("EMAIL_ALREADY_EXISTS"));
+    }
+
     // 비밀번호 정책을 만족하지 못하는 회원가입 요청은 400 유효성 검증 실패를 반환해야 한다.
     @Test
     void signupReturns400WhenPasswordPolicyIsInvalid() throws Exception {
@@ -120,6 +135,21 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.email").value("user@example.com"))
                 .andExpect(jsonPath("$.data.nickname").value("절약러"))
                 .andExpect(jsonPath("$.error").doesNotExist());
+    }
+
+    // 로그인 시 이메일 대소문자가 달라도 인증에 성공해야 한다.
+    @Test
+    void loginReturns200WhenEmailCaseIsDifferent() throws Exception {
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("email", "User@Example.Com", "password", "Password123!")
+        );
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.email").value("user@example.com"));
     }
 
     // 로그인 후 동일 세션으로 보호 경로 접근 시 401이 아닌 응답(인증 통과)을 반환해야 한다.

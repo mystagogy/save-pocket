@@ -16,6 +16,7 @@ import {
 const API_PREFIX = "/sp";
 let redirectingToLogin = false;
 const LOGIN_HINT_KEY = "sp_has_logged_in";
+const SESSION_ACTIVE_KEY = "sp_session_active";
 
 interface ApiRequestInit extends RequestInit {
   redirectOnUnauthorized?: boolean;
@@ -104,17 +105,24 @@ function handleUnauthorizedRedirect() {
     return;
   }
 
-  const hasLoginHint = readLoginHint();
+  const hasActiveSessionHint = readSessionActiveHint();
   redirectingToLogin = true;
   const currentPath = `${window.location.pathname}${window.location.search}`;
+  if (hasActiveSessionHint) {
+    const params = new URLSearchParams({
+      reason: "expired",
+      redirect: currentPath,
+    });
+    window.alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+    window.location.href = `/login?${params.toString()}`;
+    return;
+  }
+
   const params = new URLSearchParams({
-    reason: hasLoginHint ? "expired" : "required",
+    reason: "required",
     redirect: currentPath,
   });
-
-  if (hasLoginHint) {
-    window.alert("세션이 만료되었습니다. 다시 로그인해주세요.");
-  }
+  window.alert("로그인이 필요합니다.");
   window.location.href = `/login?${params.toString()}`;
 }
 
@@ -152,6 +160,10 @@ export function logout() {
   }).finally(() => {
     clearLoginHint();
   });
+}
+
+export function clearAuthClientHints() {
+  clearLoginHint();
 }
 
 export function getWishes(status?: WishStatus) {
@@ -203,19 +215,9 @@ function writeLoginHint() {
   }
   try {
     window.localStorage.setItem(LOGIN_HINT_KEY, "1");
+    window.sessionStorage.setItem(SESSION_ACTIVE_KEY, "1");
   } catch {
     // localStorage is optional for this UX signal.
-  }
-}
-
-function readLoginHint(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    return window.localStorage.getItem(LOGIN_HINT_KEY) === "1";
-  } catch {
-    return false;
   }
 }
 
@@ -225,7 +227,19 @@ function clearLoginHint() {
   }
   try {
     window.localStorage.removeItem(LOGIN_HINT_KEY);
+    window.sessionStorage.removeItem(SESSION_ACTIVE_KEY);
   } catch {
     // localStorage is optional for this UX signal.
+  }
+}
+
+function readSessionActiveHint(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return window.sessionStorage.getItem(SESSION_ACTIVE_KEY) === "1";
+  } catch {
+    return false;
   }
 }
