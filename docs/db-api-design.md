@@ -88,6 +88,21 @@
 | error_message | VARCHAR(1000) | NULL | 실패 메시지 |
 | created_at | DATETIME | NOT NULL | 생성시각 |
 
+### notification
+| 컬럼명 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, AI | 알림 ID |
+| user_id | BIGINT | NOT NULL, FK(users.id) | 수신 사용자 |
+| wish_id | BIGINT | NOT NULL, FK(product_wish.id) | 관련 위시 |
+| notification_type | VARCHAR(40) | NOT NULL | PRICE_DROP_LOWEST |
+| title | VARCHAR(150) | NOT NULL | 알림 제목 |
+| message | VARCHAR(500) | NOT NULL | 알림 본문 |
+| link_url | VARCHAR(300) | NULL | 프론트 이동 링크 |
+| is_read | BIT(1) | NOT NULL, DEFAULT 0 | 읽음 여부 |
+| read_at | DATETIME | NULL | 읽음 시각 |
+| created_at | DATETIME | NOT NULL | 생성시각 |
+| updated_at | DATETIME | NOT NULL | 수정시각 |
+
 ## 2.3 인덱스 설계
 ```sql
 CREATE UNIQUE INDEX ux_users_email ON users (email);
@@ -112,6 +127,15 @@ ON wish_event_history (wish_id, event_at DESC);
 
 CREATE INDEX idx_scheduler_run_history_job_executed
 ON scheduler_run_history (job_name, executed_at DESC);
+
+CREATE INDEX idx_notification_user_created
+ON notification (user_id, created_at DESC);
+
+CREATE INDEX idx_notification_user_unread
+ON notification (user_id, is_read, created_at DESC);
+
+CREATE INDEX idx_notification_dedup
+ON notification (user_id, wish_id, notification_type, created_at DESC);
 ```
 
 ## 2.4 상태 전이 규칙
@@ -326,12 +350,50 @@ ON scheduler_run_history (job_name, executed_at DESC);
 - `FORBIDDEN_RESOURCE` (403)
 - `VALIDATION_FAILED` (400)
 - `WISH_NOT_FOUND` (404)
+- `NOTIFICATION_NOT_FOUND` (404)
 - `INVALID_WISH_STATE` (400)
 - `MANUAL_INPUT_REQUIRED` (400)
 - `EMAIL_ALREADY_EXISTS` (409)
 - `INTERNAL_SERVER_ERROR` (500)
 
-## 3.6 프론트엔드 연동 메모 (Next.js)
+## 3.6 Notification API
+
+### GET /notifications?limit=20
+- Response `200`
+```json
+{
+  "unreadCount": 2,
+  "items": [
+    {
+      "id": 31,
+      "wishId": 10,
+      "notificationType": "PRICE_DROP_LOWEST",
+      "title": "최저가 갱신",
+      "message": "나이키 운동화 최저가가 120000원에서 99000원으로 내려갔어요.",
+      "linkUrl": "/wishes/10",
+      "read": false,
+      "createdAt": "2026-05-21T10:30:00"
+    }
+  ]
+}
+```
+
+### POST /notifications/{id}/read
+- 동작: 알림 읽음 처리
+- Response `200`
+```json
+{
+  "id": 31,
+  "read": true
+}
+```
+
+### GET /notifications/stream
+- 콘텐츠 타입: `text/event-stream`
+- 이벤트명: `notification`
+- 데이터: `NotificationItem` JSON
+
+## 3.7 프론트엔드 연동 메모 (Next.js)
 - 프론트 프로젝트 경로: `my-webapp`
 - UI 주요 경로
   - `/` : 로그인 메인 화면
