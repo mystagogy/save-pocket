@@ -27,7 +27,7 @@ public class WishPriceRefreshScheduler {
         this.schedulerRunHistoryService = schedulerRunHistoryService;
     }
 
-    @Scheduled(cron = "${wish.scheduler.price-refresh-cron:0 0 * * * *}")
+    @Scheduled(cron = "${wish.scheduler.price-refresh-cron:0 0 0,12 * * *}")
     public void refreshWishReferencePrices() {
         LocalDateTime executedAt = LocalDateTime.now();
         try {
