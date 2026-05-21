@@ -11,6 +11,8 @@ import {
   WishStatusUpdateResponse,
   WishSummaryResponse,
   MonthlySavingsResponse,
+  NotificationListResponse,
+  NotificationReadResponse,
 } from "@/lib/types";
 
 const API_PREFIX = "/sp";
@@ -207,6 +209,17 @@ export function deleteWish(id: number) {
 
 export function getMonthlySavings(options?: { redirectOnUnauthorized?: boolean }) {
   return request<MonthlySavingsResponse>("/reports/monthly", options);
+}
+
+export function getNotifications(limit = 20) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request<NotificationListResponse>(`/notifications?${params.toString()}`);
+}
+
+export function markNotificationAsRead(id: number) {
+  return request<NotificationReadResponse>(`/notifications/${id}/read`, {
+    method: "POST",
+  });
 }
 
 function writeLoginHint() {

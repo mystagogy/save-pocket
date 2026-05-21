@@ -4,6 +4,8 @@ import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
+import io.github.mystagogy.savepocket.notification.messaging.NotificationEventPublisher;
+import io.github.mystagogy.savepocket.notification.messaging.PriceDropNotificationMessage;
 import io.github.mystagogy.savepocket.report.service.ReportCacheService;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
@@ -50,6 +52,7 @@ public class WishService {
     private final UserRepository userRepository;
     private final NaverShoppingSearchClient naverShoppingSearchClient;
     private final ReportCacheService reportCacheService;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     public WishService(
             ProductWishRepository productWishRepository,
@@ -57,7 +60,8 @@ public class WishService {
             PriceHistoryRepository priceHistoryRepository,
             UserRepository userRepository,
             NaverShoppingSearchClient naverShoppingSearchClient,
-            ReportCacheService reportCacheService
+            ReportCacheService reportCacheService,
+            NotificationEventPublisher notificationEventPublisher
     ) {
         this.productWishRepository = productWishRepository;
         this.wishEventHistoryRepository = wishEventHistoryRepository;
@@ -65,6 +69,7 @@ public class WishService {
         this.userRepository = userRepository;
         this.naverShoppingSearchClient = naverShoppingSearchClient;
         this.reportCacheService = reportCacheService;
+        this.notificationEventPublisher = notificationEventPublisher;
     }
 
     @Transactional
@@ -271,6 +276,7 @@ public class WishService {
                 }
 
                 Long previousReferencePrice = wish.getReferencePrice();
+                Long historicalLowestBeforeUpdate = resolveHistoricalLowestReferencePrice(wish, previousReferencePrice);
                 if (Objects.equals(previousReferencePrice, latestLowestPrice)) {
                     skippedCount++;
                     continue;
@@ -292,6 +298,17 @@ public class WishService {
                             latestLowestPrice,
                             targetTime
                     );
+                }
+
+                if (isLowestPriceDrop(previousReferencePrice, latestLowestPrice, historicalLowestBeforeUpdate)
+                        && canPublishNotification(wish)) {
+                    notificationEventPublisher.publishPriceDropAfterCommit(new PriceDropNotificationMessage(
+                            wish.getUser().getId(),
+                            wish.getId(),
+                            previousReferencePrice,
+                            latestLowestPrice,
+                            targetTime
+                    ));
                 }
 
                 updatedCount++;
@@ -516,6 +533,34 @@ public class WishService {
             }
         }
         return false;
+    }
+
+    private Long resolveHistoricalLowestReferencePrice(ProductWish wish, Long previousReferencePrice) {
+        Long historyLowest = null;
+        if (wish.getId() != null) {
+            historyLowest = priceHistoryRepository.findMinChangedPriceByWishIdAndPriceType(
+                    wish.getId(),
+                    PriceType.REFERENCE
+            );
+        }
+        if (previousReferencePrice == null) {
+            return historyLowest;
+        }
+        if (historyLowest == null) {
+            return previousReferencePrice;
+        }
+        return Math.min(previousReferencePrice, historyLowest);
+    }
+
+    private boolean isLowestPriceDrop(Long previousReferencePrice, Long latestLowestPrice, Long historicalLowestBeforeUpdate) {
+        if (previousReferencePrice == null || latestLowestPrice == null || historicalLowestBeforeUpdate == null) {
+            return false;
+        }
+        return latestLowestPrice < previousReferencePrice && latestLowestPrice < historicalLowestBeforeUpdate;
+    }
+
+    private boolean canPublishNotification(ProductWish wish) {
+        return wish.getId() != null && wish.getUser() != null && wish.getUser().getId() != null;
     }
 
     private record UserMonthCacheKey(Long userId, YearMonth yearMonth) {

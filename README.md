@@ -34,6 +34,7 @@
   - Spring Data JPA
   - MySQL
   - Redis (세션 저장소)
+  - RabbitMQ (알림 이벤트 큐)
   - Swagger/OpenAPI
 - 프론트엔드
   - Next.js 16 (App Router)
@@ -54,6 +55,10 @@ docker compose up -d
 - `DB_PASSWORD`
 - `REDIS_HOST`
 - `REDIS_PORT`
+- `RABBITMQ_HOST`
+- `RABBITMQ_PORT`
+- `RABBITMQ_USERNAME`
+- `RABBITMQ_PASSWORD`
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `WISH_EXPIRATION_CRON` (기본: `0 */10 * * * *`)
@@ -123,6 +128,29 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - 위시 상태 변경(구매/삭제/재활성화), 만료 스케줄 실행 시 캐시 무효화
 - 무효화 시점: 트랜잭션 `afterCommit` (커밋 후 Redis eviction)
 
+## RabbitMQ 알림 가이드
+현재 RabbitMQ는 가격 하락 알림 파이프라인 용도로 사용합니다.
+- Exchange: `wish.notification.exchange`
+- Queue: `wish.notification.queue`
+- DLQ: `wish.notification.dlq`
+- Routing Key: `wish.notification.price-drop`
+
+주요 환경변수(`save-pocket/.env`):
+- `RABBITMQ_HOST` (기본 `localhost`)
+- `RABBITMQ_PORT` (기본 `5672`)
+- `RABBITMQ_USERNAME`
+- `RABBITMQ_PASSWORD`
+- `RABBITMQ_VHOST` (기본 `/`)
+- `NOTIFICATION_RABBITMQ_ENABLED` (기본 `false`, `true`일 때만 RabbitMQ 알림 파이프라인 활성화)
+
+관리 콘솔:
+- `http://localhost:15672`
+
+보안 권장사항:
+- 운영 환경에서는 관리 콘솔(`15672`)을 외부에 공개하지 않습니다.
+- RabbitMQ 계정은 기본 `guest` 대신 전용 사용자 계정을 사용합니다.
+- 큐 payload에 비밀번호/토큰/개인식별정보를 포함하지 않습니다.
+
 ## 가격 갱신 정책
 - 갱신 대상: `WAITING` 상태 위시
 - 매칭 기준: `trackedProductId`가 일치하는 상품만 반영
@@ -133,3 +161,5 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - 기획안: [docs/project-plan.md](docs/project-plan.md)
 - DB/API 설계서: [docs/db-api-design.md](docs/db-api-design.md)
 - Redis 학습 가이드: [docs/redis-guide.md](docs/redis-guide.md)
+- RabbitMQ 기술 설명서(입문): [docs/rabbitmq-basics.md](docs/rabbitmq-basics.md)
+- RabbitMQ 알림 가이드: [docs/rabbitmq-notification-guide.md](docs/rabbitmq-notification-guide.md)

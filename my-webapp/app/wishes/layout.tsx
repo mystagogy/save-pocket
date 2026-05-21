@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
+import NotificationCenter from "@/components/NotificationCenter";
 
 export default function WishesLayout({
   children,
@@ -11,6 +12,9 @@ export default function WishesLayout({
   const segment = useSelectedLayoutSegment();
   const isDetailPage =
     segment !== null && segment !== "search" && segment !== "new";
+  const isSearchPage = segment === "search";
+  const primaryLink = isSearchPage ? "/wishes" : "/wishes/search";
+  const primaryLabel = isSearchPage ? "위시 리스트" : "위시 상품 검색";
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-10">
@@ -46,24 +50,59 @@ export default function WishesLayout({
                 </svg>
               </Link>
               <Link
-                href="/wishes/search"
-                className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
+                href={primaryLink}
+                aria-label={primaryLabel}
+                title={primaryLabel}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
               >
-                위시 상품 검색
+                {isSearchPage ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 7H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M8 12H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M8 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <circle cx="4.5" cy="7" r="1.2" fill="currentColor" />
+                    <circle cx="4.5" cy="12" r="1.2" fill="currentColor" />
+                    <circle cx="4.5" cy="17" r="1.2" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M16 16L20 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                )}
               </Link>
-              <Link
-                href="/wishes"
-                className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
-              >
-                위시 리스트
-              </Link>
+              <NotificationCenter />
               <form action="/logout" method="post">
                 <button
                   id="wishes-logout-button"
                   type="submit"
-                  className="rounded-lg border border-[#d6dcef] bg-white px-3 py-2 text-sm font-medium text-[#39445f] transition hover:bg-[#f5f7fc] disabled:cursor-not-allowed"
+                  aria-label="로그아웃"
+                  title="로그아웃"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#d6dcef] bg-white text-[#39445f] transition hover:bg-[#f5f7fc] disabled:cursor-not-allowed"
                 >
-                  로그아웃
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path d="M14 7L19 12L14 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M19 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M9 5H6C5.45 5 5 5.45 5 6V18C5 18.55 5.45 19 6 19H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
                 </button>
               </form>
             </div>
