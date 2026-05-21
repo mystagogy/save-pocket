@@ -14,6 +14,7 @@ import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.common.exception.ErrorCode;
 import io.github.mystagogy.savepocket.common.exception.SavePocketException;
+import io.github.mystagogy.savepocket.notification.messaging.NotificationEventPublisher;
 import io.github.mystagogy.savepocket.report.service.ReportCacheService;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateRequest;
 import io.github.mystagogy.savepocket.wish.dto.WishCreateResponse;
@@ -22,6 +23,7 @@ import io.github.mystagogy.savepocket.wish.dto.WishStatusUpdateResponse;
 import io.github.mystagogy.savepocket.wish.dto.WishSummaryResponse;
 import io.github.mystagogy.savepocket.wish.entity.DealSourceType;
 import io.github.mystagogy.savepocket.wish.entity.PriceHistory;
+import io.github.mystagogy.savepocket.wish.entity.PriceType;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishEventHistory;
 import io.github.mystagogy.savepocket.wish.entity.WishEventType;
@@ -64,6 +66,9 @@ class WishServiceTest {
     @Mock
     private ReportCacheService reportCacheService;
 
+    @Mock
+    private NotificationEventPublisher notificationEventPublisher;
+
     private WishService wishService;
 
     @BeforeEach
@@ -74,7 +79,8 @@ class WishServiceTest {
                 priceHistoryRepository,
                 userRepository,
                 naverShoppingSearchClient,
-                reportCacheService
+                reportCacheService,
+                notificationEventPublisher
         );
     }
 
@@ -428,6 +434,64 @@ class WishServiceTest {
         ArgumentCaptor<WishEventHistory> eventCaptor = ArgumentCaptor.forClass(WishEventHistory.class);
         verify(wishEventHistoryRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WishEventType.PRICE_CHANGED);
+    }
+
+    // 기존 최저가보다 더 낮아진 경우에만 가격 하락 알림 메시지를 발행해야 한다.
+    @Test
+    void refreshLowestReferencePricesPublishesPriceDropNotificationWhenLowestIsUpdated() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        User owner = createUser(1L, "user@example.com");
+
+        ProductWish wish = new ProductWish();
+        wish.setUser(owner);
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductUrl("https://shopping.naver.com/item/456");
+        wish.setTrackedProductId("456");
+        wish.setReferencePrice(120000L);
+        ReflectionTestUtils.setField(wish, "id", 40L);
+
+        when(productWishRepository.findByStatus(WishStatus.WAITING)).thenReturn(List.of(wish));
+        when(naverShoppingSearchClient.searchProducts("456")).thenReturn(List.of(
+                new NaverShoppingProduct("동일 상품", "https://shopping.naver.com/item/456", "456", "https://img/1.jpg", 98000L, "몰A")
+        ));
+        when(priceHistoryRepository.findMinChangedPriceByWishIdAndPriceType(40L, PriceType.REFERENCE))
+                .thenReturn(110000L);
+
+        wishService.refreshLowestReferencePrices(targetTime);
+
+        ArgumentCaptor<io.github.mystagogy.savepocket.notification.messaging.PriceDropNotificationMessage> messageCaptor =
+                ArgumentCaptor.forClass(io.github.mystagogy.savepocket.notification.messaging.PriceDropNotificationMessage.class);
+        verify(notificationEventPublisher).publishPriceDropAfterCommit(messageCaptor.capture());
+        assertThat(messageCaptor.getValue().userId()).isEqualTo(1L);
+        assertThat(messageCaptor.getValue().wishId()).isEqualTo(40L);
+        assertThat(messageCaptor.getValue().previousReferencePrice()).isEqualTo(120000L);
+        assertThat(messageCaptor.getValue().latestReferencePrice()).isEqualTo(98000L);
+    }
+
+    // 기존 역대 최저가보다 낮지 않은 가격 변경은 알림 메시지를 발행하지 않아야 한다.
+    @Test
+    void refreshLowestReferencePricesDoesNotPublishNotificationWhenNotLowestDrop() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        User owner = createUser(1L, "user@example.com");
+
+        ProductWish wish = new ProductWish();
+        wish.setUser(owner);
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductUrl("https://shopping.naver.com/item/456");
+        wish.setTrackedProductId("456");
+        wish.setReferencePrice(120000L);
+        ReflectionTestUtils.setField(wish, "id", 41L);
+
+        when(productWishRepository.findByStatus(WishStatus.WAITING)).thenReturn(List.of(wish));
+        when(naverShoppingSearchClient.searchProducts("456")).thenReturn(List.of(
+                new NaverShoppingProduct("동일 상품", "https://shopping.naver.com/item/456", "456", "https://img/1.jpg", 95000L, "몰A")
+        ));
+        when(priceHistoryRepository.findMinChangedPriceByWishIdAndPriceType(41L, PriceType.REFERENCE))
+                .thenReturn(90000L);
+
+        wishService.refreshLowestReferencePrices(targetTime);
+
+        verify(notificationEventPublisher, never()).publishPriceDropAfterCommit(any());
     }
 
     // trackedProductId를 찾을 수 없으면 정확도 보장을 위해 가격 갱신을 건너뛰어야 한다.

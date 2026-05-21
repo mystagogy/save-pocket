@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
+import io.github.mystagogy.savepocket.notification.repository.NotificationRepository;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
@@ -50,6 +51,9 @@ class ReportControllerIntegrationTest {
     private PriceHistoryRepository priceHistoryRepository;
 
     @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private User user1;
@@ -57,6 +61,7 @@ class ReportControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        notificationRepository.deleteAll();
         wishEventHistoryRepository.deleteAll();
         priceHistoryRepository.deleteAll();
         productWishRepository.deleteAll();

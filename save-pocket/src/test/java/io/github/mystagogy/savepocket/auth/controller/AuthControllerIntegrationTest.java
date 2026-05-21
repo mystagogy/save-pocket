@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
+import io.github.mystagogy.savepocket.notification.repository.NotificationRepository;
 import jakarta.servlet.http.HttpSession;
 import java.util.Map;
 import org.assertj.core.api.Assertions;
@@ -43,8 +44,12 @@ class AuthControllerIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private NotificationRepository notificationRepository;
+
     @BeforeEach
     void setUp() {
+        notificationRepository.deleteAll();
         userRepository.deleteAll();
 
         User user = new User();
