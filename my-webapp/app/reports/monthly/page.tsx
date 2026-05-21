@@ -110,26 +110,54 @@ export default function MonthlyReportPage() {
             </Link>
             <Link
               href="/wishes/search"
-              className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
+              aria-label="위시 상품 검색"
+              title="위시 상품 검색"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
             >
-              위시 상품 검색
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M16 16L20 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
             </Link>
             <Link
               href="/wishes"
-              className="rounded-lg border border-[#bfcbec] bg-white px-3 py-2 text-sm font-medium"
+              aria-label="위시 리스트"
+              title="위시 리스트"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
             >
-              위시 리스트
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <path d="M8 7H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8 12H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="4.5" cy="7" r="1.2" fill="currentColor" />
+                <circle cx="4.5" cy="12" r="1.2" fill="currentColor" />
+                <circle cx="4.5" cy="17" r="1.2" fill="currentColor" />
+              </svg>
             </Link>
           </div>
         </div>
       </header>
 
       <section className="mt-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
-        <div>
-          <h2 className="text-xl font-semibold">이번 달 절약 리포트</h2>
-          <p className="mt-1 text-sm text-[#4b556d]">
-            {summary ? `${summary.year}년 ${summary.month}월 기준` : "집계 기준 확인 중"}
-          </p>
+        <div className="flex justify-end">
+          <div className="text-right">
+            <h2 className="text-xl font-semibold">이번 달 절약 리포트</h2>
+            <p className="mt-1 text-sm text-[#4b556d]">
+              {summary ? `${summary.year}년 ${summary.month}월 기준` : "집계 기준 확인 중"}
+            </p>
+          </div>
         </div>
 
         <div id="monthly-react-dynamic">

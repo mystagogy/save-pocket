@@ -137,3 +137,26 @@ export interface MonthlySavingsDetailItem {
   occurredAt: string;
   signedAmount: number;
 }
+
+export type NotificationType = "PRICE_DROP_LOWEST";
+
+export interface NotificationItem {
+  id: number;
+  wishId: number | null;
+  notificationType: NotificationType;
+  title: string;
+  message: string;
+  linkUrl: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  unreadCount: number;
+  items: NotificationItem[];
+}
+
+export interface NotificationReadResponse {
+  id: number;
+  read: boolean;
+}
