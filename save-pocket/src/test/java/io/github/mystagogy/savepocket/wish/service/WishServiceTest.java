@@ -537,6 +537,38 @@ class WishServiceTest {
         assertThat(wish.getTrackedProductId()).isEqualTo("456");
     }
 
+    // 단건 갱신은 WAITING 상태 위시에만 적용되어야 하며, 대상이 없으면 false를 반환해야 한다.
+    @Test
+    void refreshLowestReferencePriceByWishIdReturnsFalseWhenNoWaitingWish() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        when(productWishRepository.findByIdAndStatus(99L, WishStatus.WAITING)).thenReturn(Optional.empty());
+
+        boolean refreshed = wishService.refreshLowestReferencePriceByWishId(99L, targetTime);
+
+        assertThat(refreshed).isFalse();
+        verify(naverShoppingSearchClient, never()).searchProducts(any(String.class));
+    }
+
+    // 단건 갱신은 가격이 바뀐 경우 true를 반환해야 한다.
+    @Test
+    void refreshLowestReferencePriceByWishIdReturnsTrueWhenUpdated() {
+        LocalDateTime targetTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        ProductWish wish = new ProductWish();
+        wish.setStatus(WishStatus.WAITING);
+        wish.setProductUrl("https://shopping.naver.com/item/456");
+        wish.setReferencePrice(120000L);
+
+        when(productWishRepository.findByIdAndStatus(55L, WishStatus.WAITING)).thenReturn(Optional.of(wish));
+        when(naverShoppingSearchClient.searchProducts("456")).thenReturn(List.of(
+                new NaverShoppingProduct("동일 상품", "https://shopping.naver.com/item/456", "456", "https://img/1.jpg", 100000L, "몰A")
+        ));
+
+        boolean refreshed = wishService.refreshLowestReferencePriceByWishId(55L, targetTime);
+
+        assertThat(refreshed).isTrue();
+        assertThat(wish.getReferencePrice()).isEqualTo(100000L);
+    }
+
     private User createUser(Long id, String email) {
         User user = new User();
         ReflectionTestUtils.setField(user, "id", id);

@@ -1,4 +1,4 @@
-package io.github.mystagogy.savepocket.notification.messaging;
+package io.github.mystagogy.savepocket.wish.messaging;
 
 import java.util.Map;
 import org.springframework.amqp.core.Binding;
@@ -11,22 +11,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConditionalOnProperty(prefix = "notification.rabbitmq", name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(NotificationRabbitProperties.class)
-public class NotificationRabbitConfig {
+@ConditionalOnProperty(prefix = "wish.price-refresh.rabbitmq", name = "enabled", havingValue = "true")
+@EnableConfigurationProperties(WishPriceRefreshRabbitProperties.class)
+public class WishPriceRefreshRabbitConfig {
 
     @Bean
-    public DirectExchange notificationExchange(NotificationRabbitProperties properties) {
+    public DirectExchange wishPriceRefreshExchange(WishPriceRefreshRabbitProperties properties) {
         return new DirectExchange(properties.exchange(), true, false);
     }
 
     @Bean
-    public Queue notificationDlq(NotificationRabbitProperties properties) {
+    public Queue wishPriceRefreshDlq(WishPriceRefreshRabbitProperties properties) {
         return new Queue(properties.dlq(), true);
     }
 
     @Bean
-    public Queue notificationQueue(NotificationRabbitProperties properties) {
+    public Queue wishPriceRefreshQueue(WishPriceRefreshRabbitProperties properties) {
         return new Queue(
                 properties.queue(),
                 true,
@@ -37,11 +37,11 @@ public class NotificationRabbitConfig {
     }
 
     @Bean
-    public Binding notificationBinding(
-            Queue notificationQueue,
-            DirectExchange notificationExchange,
-            NotificationRabbitProperties properties
+    public Binding wishPriceRefreshBinding(
+            Queue wishPriceRefreshQueue,
+            DirectExchange wishPriceRefreshExchange,
+            WishPriceRefreshRabbitProperties properties
     ) {
-        return BindingBuilder.bind(notificationQueue).to(notificationExchange).with(properties.routingKey());
+        return BindingBuilder.bind(wishPriceRefreshQueue).to(wishPriceRefreshExchange).with(properties.routingKey());
     }
 }

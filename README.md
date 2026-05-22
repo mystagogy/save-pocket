@@ -59,6 +59,7 @@ docker compose up -d
 - `RABBITMQ_PORT`
 - `RABBITMQ_USERNAME`
 - `RABBITMQ_PASSWORD`
+- `WISH_PRICE_REFRESH_RABBITMQ_ENABLED` (기본: `false`)
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `WISH_EXPIRATION_CRON` (기본: `0 */10 * * * *`)
@@ -129,11 +130,19 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - 무효화 시점: 트랜잭션 `afterCommit` (커밋 후 Redis eviction)
 
 ## RabbitMQ 알림 가이드
-현재 RabbitMQ는 가격 하락 알림 파이프라인 용도로 사용합니다.
+현재 RabbitMQ는 아래 2가지 파이프라인 용도로 사용합니다.
+
+1) P1: 가격 하락 알림 파이프라인
 - Exchange: `wish.notification.exchange`
 - Queue: `wish.notification.queue`
 - DLQ: `wish.notification.dlq`
 - Routing Key: `wish.notification.price-drop`
+
+2) P2: 가격 갱신 작업 큐 파이프라인
+- Exchange: `wish.price-refresh.exchange`
+- Queue: `wish.price-refresh.queue`
+- DLQ: `wish.price-refresh.dlq`
+- Routing Key: `wish.price-refresh.request`
 
 주요 환경변수(`save-pocket/.env`):
 - `RABBITMQ_HOST` (기본 `localhost`)
@@ -142,6 +151,7 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - `RABBITMQ_PASSWORD`
 - `RABBITMQ_VHOST` (기본 `/`)
 - `NOTIFICATION_RABBITMQ_ENABLED` (기본 `false`, `true`일 때만 RabbitMQ 알림 파이프라인 활성화)
+- `WISH_PRICE_REFRESH_RABBITMQ_ENABLED` (기본 `false`, `true`일 때만 가격 갱신 큐 파이프라인 활성화)
 
 관리 콘솔:
 - `http://localhost:15672`
@@ -163,3 +173,4 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - Redis 학습 가이드: [docs/redis-guide.md](docs/redis-guide.md)
 - RabbitMQ 기술 설명서(입문): [docs/rabbitmq-basics.md](docs/rabbitmq-basics.md)
 - RabbitMQ 알림 가이드: [docs/rabbitmq-notification-guide.md](docs/rabbitmq-notification-guide.md)
+- RabbitMQ 가격 갱신 큐화 가이드(P2): [docs/rabbitmq-price-refresh-guide.md](docs/rabbitmq-price-refresh-guide.md)
