@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ProductWishRepository extends JpaRepository<ProductWish, Long> {
     List<ProductWish> findByUser_IdAndStatusOrderByUpdatedAtDesc(Long userId, WishStatus status);
@@ -17,6 +19,15 @@ public interface ProductWishRepository extends JpaRepository<ProductWish, Long> 
     List<ProductWish> findByStatusAndExpireAtLessThanEqual(WishStatus status, LocalDateTime targetTime);
 
     List<ProductWish> findByStatus(WishStatus status);
+
+    Optional<ProductWish> findByIdAndStatus(Long id, WishStatus status);
+
+    @Query("""
+            select pw.id
+              from ProductWish pw
+             where pw.status = :status
+            """)
+    List<Long> findIdsByStatus(@Param("status") WishStatus status);
 
     long countByUser_IdAndStatusAndExpiredAtBetween(Long userId, WishStatus status, LocalDateTime start, LocalDateTime end);
 }

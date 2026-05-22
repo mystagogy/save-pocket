@@ -2,8 +2,8 @@ package io.github.mystagogy.savepocket.wish.scheduler;
 
 import io.github.mystagogy.savepocket.scheduler.entity.SchedulerRunStatus;
 import io.github.mystagogy.savepocket.scheduler.service.SchedulerRunHistoryService;
-import io.github.mystagogy.savepocket.wish.service.WishService;
-import io.github.mystagogy.savepocket.wish.service.WishService.PriceRefreshResult;
+import io.github.mystagogy.savepocket.wish.messaging.PriceRefreshDispatchResult;
+import io.github.mystagogy.savepocket.wish.messaging.WishPriceRefreshDispatcher;
 import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,14 +16,14 @@ public class WishPriceRefreshScheduler {
     private static final Logger log = LoggerFactory.getLogger(WishPriceRefreshScheduler.class);
     private static final String JOB_NAME = "wishPriceRefreshScheduler";
 
-    private final WishService wishService;
+    private final WishPriceRefreshDispatcher wishPriceRefreshDispatcher;
     private final SchedulerRunHistoryService schedulerRunHistoryService;
 
     public WishPriceRefreshScheduler(
-            WishService wishService,
+            WishPriceRefreshDispatcher wishPriceRefreshDispatcher,
             SchedulerRunHistoryService schedulerRunHistoryService
     ) {
-        this.wishService = wishService;
+        this.wishPriceRefreshDispatcher = wishPriceRefreshDispatcher;
         this.schedulerRunHistoryService = schedulerRunHistoryService;
     }
 
@@ -31,7 +31,7 @@ public class WishPriceRefreshScheduler {
     public void refreshWishReferencePrices() {
         LocalDateTime executedAt = LocalDateTime.now();
         try {
-            PriceRefreshResult result = wishService.refreshLowestReferencePrices(executedAt);
+            PriceRefreshDispatchResult result = wishPriceRefreshDispatcher.dispatch(executedAt);
             LocalDateTime finishedAt = LocalDateTime.now();
             SchedulerRunStatus status = result.failedCount() > 0
                     ? SchedulerRunStatus.PARTIAL_SUCCESS

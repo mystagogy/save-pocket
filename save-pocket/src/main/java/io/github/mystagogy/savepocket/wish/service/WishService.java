@@ -269,55 +269,25 @@ public class WishService {
         for (ProductWish wish : waitingWishes) {
             scannedCount++;
             try {
-                Long latestLowestPrice = resolveLatestLowestPrice(wish);
-                if (latestLowestPrice == null) {
+                RefreshOutcome outcome = refreshLowestReferencePrice(wish, targetTime);
+                if (outcome == RefreshOutcome.UPDATED) {
+                    updatedCount++;
+                } else {
                     skippedCount++;
-                    continue;
                 }
-
-                Long previousReferencePrice = wish.getReferencePrice();
-                Long historicalLowestBeforeUpdate = resolveHistoricalLowestReferencePrice(wish, previousReferencePrice);
-                if (Objects.equals(previousReferencePrice, latestLowestPrice)) {
-                    skippedCount++;
-                    continue;
-                }
-
-                wish.setReferencePrice(latestLowestPrice);
-                appendEvent(
-                        wish,
-                        WishEventType.PRICE_CHANGED,
-                        targetTime,
-                        "기준가 자동 갱신: " + previousReferencePrice + " -> " + latestLowestPrice
-                );
-
-                if (previousReferencePrice != null) {
-                    appendPriceHistory(
-                            wish,
-                            PriceType.REFERENCE,
-                            previousReferencePrice,
-                            latestLowestPrice,
-                            targetTime
-                    );
-                }
-
-                if (isLowestPriceDrop(previousReferencePrice, latestLowestPrice, historicalLowestBeforeUpdate)
-                        && canPublishNotification(wish)) {
-                    notificationEventPublisher.publishPriceDropAfterCommit(new PriceDropNotificationMessage(
-                            wish.getUser().getId(),
-                            wish.getId(),
-                            previousReferencePrice,
-                            latestLowestPrice,
-                            targetTime
-                    ));
-                }
-
-                updatedCount++;
             } catch (RuntimeException ex) {
                 failedCount++;
             }
         }
 
         return new PriceRefreshResult(scannedCount, updatedCount, skippedCount, failedCount);
+    }
+
+    @Transactional
+    public boolean refreshLowestReferencePriceByWishId(Long wishId, LocalDateTime targetTime) {
+        return productWishRepository.findByIdAndStatus(wishId, WishStatus.WAITING)
+                .map(wish -> refreshLowestReferencePrice(wish, targetTime) == RefreshOutcome.UPDATED)
+                .orElse(false);
     }
 
     private ProductWish getAccessibleWish(Long userId, Long wishId) {
@@ -563,7 +533,56 @@ public class WishService {
         return wish.getId() != null && wish.getUser() != null && wish.getUser().getId() != null;
     }
 
+    private RefreshOutcome refreshLowestReferencePrice(ProductWish wish, LocalDateTime targetTime) {
+        Long latestLowestPrice = resolveLatestLowestPrice(wish);
+        if (latestLowestPrice == null) {
+            return RefreshOutcome.SKIPPED;
+        }
+
+        Long previousReferencePrice = wish.getReferencePrice();
+        Long historicalLowestBeforeUpdate = resolveHistoricalLowestReferencePrice(wish, previousReferencePrice);
+        if (Objects.equals(previousReferencePrice, latestLowestPrice)) {
+            return RefreshOutcome.SKIPPED;
+        }
+
+        wish.setReferencePrice(latestLowestPrice);
+        appendEvent(
+                wish,
+                WishEventType.PRICE_CHANGED,
+                targetTime,
+                "기준가 자동 갱신: " + previousReferencePrice + " -> " + latestLowestPrice
+        );
+
+        if (previousReferencePrice != null) {
+            appendPriceHistory(
+                    wish,
+                    PriceType.REFERENCE,
+                    previousReferencePrice,
+                    latestLowestPrice,
+                    targetTime
+            );
+        }
+
+        if (isLowestPriceDrop(previousReferencePrice, latestLowestPrice, historicalLowestBeforeUpdate)
+                && canPublishNotification(wish)) {
+            notificationEventPublisher.publishPriceDropAfterCommit(new PriceDropNotificationMessage(
+                    wish.getUser().getId(),
+                    wish.getId(),
+                    previousReferencePrice,
+                    latestLowestPrice,
+                    targetTime
+            ));
+        }
+
+        return RefreshOutcome.UPDATED;
+    }
+
     private record UserMonthCacheKey(Long userId, YearMonth yearMonth) {
+    }
+
+    private enum RefreshOutcome {
+        UPDATED,
+        SKIPPED
     }
 
     public record PriceRefreshResult(
