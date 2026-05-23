@@ -23,5 +23,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             LocalDateTime createdAt
     );
 
+    boolean existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            Long userId,
+            NotificationType notificationType,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
     long countByUser_IdAndReadFalse(Long userId);
 }
