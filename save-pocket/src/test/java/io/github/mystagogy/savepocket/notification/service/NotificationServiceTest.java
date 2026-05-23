@@ -19,7 +19,6 @@ import io.github.mystagogy.savepocket.notification.repository.NotificationReposi
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -129,33 +128,35 @@ class NotificationServiceTest {
 
     @Test
     void createDailySavedSummaryNotificationsCreatesOneNotificationPerUser() {
-        LocalDate targetDate = LocalDate.of(2026, 5, 23);
+        LocalDateTime referenceTime = LocalDateTime.of(2026, 5, 23, 22, 0);
+        LocalDateTime start = referenceTime.minusHours(24);
+        LocalDateTime end = referenceTime;
         ProductWish wish = createWish(1L, 20L, "에어팟");
         wish.setStatus(WishStatus.EXPIRED);
         wish.setSavedAmount(12300L);
-        wish.setExpiredAt(targetDate.atTime(12, 0));
+        wish.setExpiredAt(LocalDateTime.of(2026, 5, 23, 12, 0));
 
         when(productWishRepository.summarizeDailySavedAmountByUser(
                 eq(WishStatus.EXPIRED),
-                eq(targetDate.atStartOfDay()),
-                eq(targetDate.plusDays(1).atStartOfDay())
+                eq(start),
+                eq(end)
         )).thenReturn(List.of(dailySavedAmountSummary(1L, 12300L, 20L)));
         when(notificationRepository.existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 1L,
                 NotificationType.DAILY_SAVED_SUMMARY,
-                targetDate.atStartOfDay(),
-                targetDate.plusDays(1).atStartOfDay()
+                start,
+                end
         )).thenReturn(false);
         when(productWishRepository.findByIdAndUser_Id(20L, 1L)).thenReturn(Optional.of(wish));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
             Notification saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 101L);
-            ReflectionTestUtils.setField(saved, "createdAt", targetDate.atTime(22, 0));
+            ReflectionTestUtils.setField(saved, "createdAt", referenceTime);
             return saved;
         });
 
         NotificationService.DailySavedSummaryResult result =
-                notificationService.createDailySavedSummaryNotifications(targetDate);
+                notificationService.createDailySavedSummaryNotifications(referenceTime);
 
         assertThat(result.scannedCount()).isEqualTo(1);
         assertThat(result.createdCount()).isEqualTo(1);
@@ -165,30 +166,32 @@ class NotificationServiceTest {
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(notificationCaptor.capture());
         assertThat(notificationCaptor.getValue().getNotificationType()).isEqualTo(NotificationType.DAILY_SAVED_SUMMARY);
-        assertThat(notificationCaptor.getValue().getTitle()).isEqualTo("오늘의 절약 리포트");
-        assertThat(notificationCaptor.getValue().getMessage()).contains("12,300원");
+        assertThat(notificationCaptor.getValue().getTitle()).isEqualTo("최근 24시간 절약 리포트");
+        assertThat(notificationCaptor.getValue().getMessage()).contains("최근 24시간 내에 총").contains("12,300원");
         assertThat(notificationCaptor.getValue().getLinkUrl()).isEqualTo("/reports/monthly");
 
         verify(notificationSseService).publishNotification(eq(1L), any());
     }
 
     @Test
-    void createDailySavedSummaryNotificationsSkipsWhenDuplicatedInSameDay() {
-        LocalDate targetDate = LocalDate.of(2026, 5, 23);
+    void createDailySavedSummaryNotificationsSkipsWhenDuplicatedInWindow() {
+        LocalDateTime referenceTime = LocalDateTime.of(2026, 5, 23, 22, 0);
+        LocalDateTime start = referenceTime.minusHours(24);
+        LocalDateTime end = referenceTime;
         when(productWishRepository.summarizeDailySavedAmountByUser(
                 eq(WishStatus.EXPIRED),
-                eq(targetDate.atStartOfDay()),
-                eq(targetDate.plusDays(1).atStartOfDay())
+                eq(start),
+                eq(end)
         )).thenReturn(List.of(dailySavedAmountSummary(1L, 5000L, 20L)));
         when(notificationRepository.existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 1L,
                 NotificationType.DAILY_SAVED_SUMMARY,
-                targetDate.atStartOfDay(),
-                targetDate.plusDays(1).atStartOfDay()
+                start,
+                end
         )).thenReturn(true);
 
         NotificationService.DailySavedSummaryResult result =
-                notificationService.createDailySavedSummaryNotifications(targetDate);
+                notificationService.createDailySavedSummaryNotifications(referenceTime);
 
         assertThat(result.scannedCount()).isEqualTo(1);
         assertThat(result.createdCount()).isEqualTo(0);

@@ -38,7 +38,7 @@ public class DailySavedSummaryNotificationScheduler {
     public void sendDailySavedSummaryNotifications() {
         LocalDateTime executedAt = LocalDateTime.now();
         try {
-            DailySavedSummaryResult result = notificationService.createDailySavedSummaryNotifications(executedAt.toLocalDate());
+            DailySavedSummaryResult result = notificationService.createDailySavedSummaryNotifications(executedAt);
             LocalDateTime finishedAt = LocalDateTime.now();
             SchedulerRunStatus status = result.failedCount() > 0
                     ? SchedulerRunStatus.PARTIAL_SUCCESS

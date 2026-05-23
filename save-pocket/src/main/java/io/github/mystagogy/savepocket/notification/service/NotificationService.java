@@ -11,7 +11,6 @@ import io.github.mystagogy.savepocket.notification.repository.NotificationReposi
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -105,9 +104,9 @@ public class NotificationService {
     }
 
     @Transactional
-    public DailySavedSummaryResult createDailySavedSummaryNotifications(LocalDate targetDate) {
-        LocalDateTime start = targetDate.atStartOfDay();
-        LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
+    public DailySavedSummaryResult createDailySavedSummaryNotifications(LocalDateTime referenceTime) {
+        LocalDateTime end = referenceTime;
+        LocalDateTime start = referenceTime.minusHours(24);
 
         List<ProductWishRepository.DailySavedAmountSummary> summaries =
                 productWishRepository.summarizeDailySavedAmountByUser(WishStatus.EXPIRED, start, end);
@@ -150,8 +149,8 @@ public class NotificationService {
                 notification.setUser(representativeWish.getUser());
                 notification.setWish(representativeWish);
                 notification.setNotificationType(NotificationType.DAILY_SAVED_SUMMARY);
-                notification.setTitle("오늘의 절약 리포트");
-                notification.setMessage("오늘도 총 " + formatCurrency(totalSavedAmount) + "원을 아끼셨어요.");
+                notification.setTitle("최근 24시간 절약 리포트");
+                notification.setMessage("최근 24시간 내에 총 " + formatCurrency(totalSavedAmount) + "원을 아끼셨어요.");
                 notification.setLinkUrl("/reports/monthly");
                 Notification saved = notificationRepository.save(notification);
                 notificationSseService.publishNotification(userId, toItem(saved));
