@@ -94,7 +94,7 @@
 | id | BIGINT | PK, AI | 알림 ID |
 | user_id | BIGINT | NOT NULL, FK(users.id) | 수신 사용자 |
 | wish_id | BIGINT | NOT NULL, FK(product_wish.id) | 관련 위시 |
-| notification_type | VARCHAR(40) | NOT NULL | PRICE_DROP_LOWEST |
+| notification_type | VARCHAR(40) | NOT NULL | PRICE_DROP_LOWEST / DAILY_SAVED_SUMMARY |
 | title | VARCHAR(150) | NOT NULL | 알림 제목 |
 | message | VARCHAR(500) | NOT NULL | 알림 본문 |
 | link_url | VARCHAR(300) | NULL | 프론트 이동 링크 |
@@ -373,6 +373,16 @@ ON notification (user_id, wish_id, notification_type, created_at DESC);
       "linkUrl": "/wishes/10",
       "read": false,
       "createdAt": "2026-05-21T10:30:00"
+    },
+    {
+      "id": 32,
+      "wishId": 18,
+      "notificationType": "DAILY_SAVED_SUMMARY",
+      "title": "최근 24시간 절약 리포트",
+      "message": "최근 24시간 내에 총 12,300원을 아끼셨어요.",
+      "linkUrl": "/reports/monthly",
+      "read": false,
+      "createdAt": "2026-05-23T22:00:00"
     }
   ]
 }
@@ -408,9 +418,13 @@ ON notification (user_id, wish_id, notification_type, created_at DESC);
 ## 4. 스케줄러 설계
 - 만료 판정: `${WISH_EXPIRATION_CRON:0 */10 * * * *}`
 - 가격 갱신: `${WISH_PRICE_REFRESH_CRON:0 0 * * * *}`
+- 일일 절약 합산 알림: `${NOTIFICATION_DAILY_SAVINGS_CRON:0 0 22 * * *}`
 - 대상 조회
   - 만료: `status='WAITING' AND expire_at <= now`
   - 가격 갱신: `status IN ('WAITING')`
+  - 일일 절약 합산 알림: 최근 24시간(`executedAt-24h` ~ `executedAt`) 내 `EXPIRED` + `savedAmount > 0` 데이터 사용자별 집계
+- 중복 방지
+  - `DAILY_SAVED_SUMMARY`는 동일 사용자 기준 최근 24시간 윈도우에 1회만 생성
 - 실패 처리
   - 상품 단위 try/catch
   - 실패 건만 warn 로깅, 배치는 계속
