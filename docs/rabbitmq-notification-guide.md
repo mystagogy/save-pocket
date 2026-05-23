@@ -3,6 +3,7 @@
 ## 1. 목적
 - 12시간 가격 갱신 배치에서 `역대 최저가 갱신`이 발생하면 사용자에게 앱 내 실시간 알림을 전달한다.
 - 배치 트랜잭션과 알림 전송을 분리해 실패 전파를 줄이고, 이후 확장(Kafka/다중 채널)을 대비한다.
+- 참고: `일일 절약 합산 알림`은 동일한 알림 테이블/SSE 채널을 사용하지만 RabbitMQ 경로가 아닌 스케줄러 직접 생성 경로를 사용한다.
 
 ## 2. 아키텍처
 1. `WishService.refreshLowestReferencePrices`가 가격 변동을 감지한다.
@@ -26,6 +27,12 @@
 - 알림 트리거: `latestReferencePrice < previousReferencePrice` 이면서 `latestReferencePrice < historicalLowestBeforeUpdate`
 - 중복 억제: 동일 사용자/위시/알림유형 `24시간` 쿨다운
 - 알림 유형: `PRICE_DROP_LOWEST`
+
+추가 알림 유형(비-RabbitMQ 경로):
+- `DAILY_SAVED_SUMMARY`
+- 생성 기준: 최근 24시간 내 `EXPIRED` 상태로 전환된 위시의 `savedAmount`를 사용자별 합산
+- 기본 실행 시각: `22:00` (`NOTIFICATION_DAILY_SAVINGS_CRON`)
+- 중복 억제: 동일 사용자 기준 최근 24시간 윈도우 내 1회
 
 ## 5. 로컬 실행
 1) 환경변수 준비
@@ -61,6 +68,7 @@ npm run dev
 - SSE 엔드포인트(`/notifications/stream`)는 세션 인증이 필요한 API로 유지한다.
 - 운영 환경에서는 RabbitMQ 관리 포트를 사설망/VPN 내부로 제한한다.
 - RabbitMQ 계정은 최소 권한 원칙으로 분리한다.
+- 스케줄러 알림(`DAILY_SAVED_SUMMARY`)도 동일하게 최소 데이터만 저장/전달한다.
 
 ## 7. 장애 대응
 - RabbitMQ 장애 시 배치의 핵심 DB 갱신은 유지되고, 알림만 지연될 수 있다.

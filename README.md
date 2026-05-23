@@ -16,6 +16,7 @@
 - 자동 조회 실패 시 수동 입력 폴백
 - 72시간 관심 기반 만료 로직
 - 가격 변동 추적 및 이벤트 이력 저장
+- 가격 하락/일일 절약 합산 알림
 - 스케줄러 실행 이력 저장(`scheduler_run_history`)
 - 월별 절약 리포트
 
@@ -59,6 +60,8 @@ docker compose up -d
 - `RABBITMQ_PORT`
 - `RABBITMQ_USERNAME`
 - `RABBITMQ_PASSWORD`
+- `NOTIFICATION_DAILY_SAVINGS_ENABLED` (기본: `true`)
+- `NOTIFICATION_DAILY_SAVINGS_CRON` (기본: `0 0 22 * * *`)
 - `WISH_PRICE_REFRESH_RABBITMQ_ENABLED` (기본: `false`)
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
@@ -152,6 +155,12 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - `RABBITMQ_VHOST` (기본 `/`)
 - `NOTIFICATION_RABBITMQ_ENABLED` (기본 `false`, `true`일 때만 RabbitMQ 알림 파이프라인 활성화)
 - `WISH_PRICE_REFRESH_RABBITMQ_ENABLED` (기본 `false`, `true`일 때만 가격 갱신 큐 파이프라인 활성화)
+
+참고:
+- `일일 절약 합산 알림`은 RabbitMQ를 거치지 않고 스케줄러에서 직접 생성 후 SSE로 발송합니다.
+- 설정값:
+  - `NOTIFICATION_DAILY_SAVINGS_ENABLED` (기본 `true`)
+  - `NOTIFICATION_DAILY_SAVINGS_CRON` (기본 `0 0 22 * * *`)
 
 관리 콘솔:
 - `http://localhost:15672`

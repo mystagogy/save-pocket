@@ -9,9 +9,11 @@ import io.github.mystagogy.savepocket.notification.entity.Notification;
 import io.github.mystagogy.savepocket.notification.entity.NotificationType;
 import io.github.mystagogy.savepocket.notification.repository.NotificationRepository;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
+import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,6 +103,66 @@ public class NotificationService {
         notificationSseService.publishNotification(userId, toItem(saved));
     }
 
+    @Transactional
+    public DailySavedSummaryResult createDailySavedSummaryNotifications(LocalDateTime referenceTime) {
+        LocalDateTime end = referenceTime;
+        LocalDateTime start = referenceTime.minusHours(24);
+
+        List<ProductWishRepository.DailySavedAmountSummary> summaries =
+                productWishRepository.summarizeDailySavedAmountByUser(WishStatus.EXPIRED, start, end);
+
+        int scannedCount = summaries.size();
+        int createdCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+
+        for (ProductWishRepository.DailySavedAmountSummary summary : summaries) {
+            try {
+                Long userId = summary.getUserId();
+                Long totalSavedAmount = summary.getTotalSavedAmount();
+                Long representativeWishId = summary.getRepresentativeWishId();
+                if (userId == null || totalSavedAmount == null || totalSavedAmount <= 0 || representativeWishId == null) {
+                    skippedCount++;
+                    continue;
+                }
+
+                boolean duplicated =
+                        notificationRepository.existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                                userId,
+                                NotificationType.DAILY_SAVED_SUMMARY,
+                                start,
+                                end
+                        );
+                if (duplicated) {
+                    skippedCount++;
+                    continue;
+                }
+
+                ProductWish representativeWish = productWishRepository.findByIdAndUser_Id(representativeWishId, userId)
+                        .orElse(null);
+                if (representativeWish == null) {
+                    skippedCount++;
+                    continue;
+                }
+
+                Notification notification = new Notification();
+                notification.setUser(representativeWish.getUser());
+                notification.setWish(representativeWish);
+                notification.setNotificationType(NotificationType.DAILY_SAVED_SUMMARY);
+                notification.setTitle("최근 24시간 절약 리포트");
+                notification.setMessage("최근 24시간 내에 총 " + formatCurrency(totalSavedAmount) + "원을 아끼셨어요.");
+                notification.setLinkUrl("/reports/monthly");
+                Notification saved = notificationRepository.save(notification);
+                notificationSseService.publishNotification(userId, toItem(saved));
+                createdCount++;
+            } catch (RuntimeException ex) {
+                failedCount++;
+            }
+        }
+
+        return new DailySavedSummaryResult(scannedCount, createdCount, skippedCount, failedCount);
+    }
+
     private int resolveLimit(Integer limit) {
         if (limit == null || limit <= 0) {
             return DEFAULT_LIMIT;
@@ -121,5 +183,20 @@ public class NotificationService {
                 notification.isRead(),
                 notification.getCreatedAt()
         );
+    }
+
+    private String formatCurrency(Long amount) {
+        if (amount == null) {
+            return "0";
+        }
+        return String.format(Locale.KOREA, "%,d", amount);
+    }
+
+    public record DailySavedSummaryResult(
+            int scannedCount,
+            int createdCount,
+            int skippedCount,
+            int failedCount
+    ) {
     }
 }

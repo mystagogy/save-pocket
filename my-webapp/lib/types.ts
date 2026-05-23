@@ -138,7 +138,7 @@ export interface MonthlySavingsDetailItem {
   signedAmount: number;
 }
 
-export type NotificationType = "PRICE_DROP_LOWEST";
+export type NotificationType = "PRICE_DROP_LOWEST" | "DAILY_SAVED_SUMMARY";
 
 export interface NotificationItem {
   id: number;
