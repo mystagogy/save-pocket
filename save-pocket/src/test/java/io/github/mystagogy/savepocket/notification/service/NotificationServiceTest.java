@@ -17,7 +17,9 @@ import io.github.mystagogy.savepocket.notification.entity.Notification;
 import io.github.mystagogy.savepocket.notification.entity.NotificationType;
 import io.github.mystagogy.savepocket.notification.repository.NotificationRepository;
 import io.github.mystagogy.savepocket.wish.entity.ProductWish;
+import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -125,6 +127,78 @@ class NotificationServiceTest {
         verify(notificationSseService).publishNotification(eq(1L), any());
     }
 
+    @Test
+    void createDailySavedSummaryNotificationsCreatesOneNotificationPerUser() {
+        LocalDate targetDate = LocalDate.of(2026, 5, 23);
+        ProductWish wish = createWish(1L, 20L, "에어팟");
+        wish.setStatus(WishStatus.EXPIRED);
+        wish.setSavedAmount(12300L);
+        wish.setExpiredAt(targetDate.atTime(12, 0));
+
+        when(productWishRepository.summarizeDailySavedAmountByUser(
+                eq(WishStatus.EXPIRED),
+                eq(targetDate.atStartOfDay()),
+                eq(targetDate.plusDays(1).atStartOfDay())
+        )).thenReturn(List.of(dailySavedAmountSummary(1L, 12300L, 20L)));
+        when(notificationRepository.existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                1L,
+                NotificationType.DAILY_SAVED_SUMMARY,
+                targetDate.atStartOfDay(),
+                targetDate.plusDays(1).atStartOfDay()
+        )).thenReturn(false);
+        when(productWishRepository.findByIdAndUser_Id(20L, 1L)).thenReturn(Optional.of(wish));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
+            Notification saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 101L);
+            ReflectionTestUtils.setField(saved, "createdAt", targetDate.atTime(22, 0));
+            return saved;
+        });
+
+        NotificationService.DailySavedSummaryResult result =
+                notificationService.createDailySavedSummaryNotifications(targetDate);
+
+        assertThat(result.scannedCount()).isEqualTo(1);
+        assertThat(result.createdCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(0);
+        assertThat(result.failedCount()).isEqualTo(0);
+
+        ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(notificationCaptor.capture());
+        assertThat(notificationCaptor.getValue().getNotificationType()).isEqualTo(NotificationType.DAILY_SAVED_SUMMARY);
+        assertThat(notificationCaptor.getValue().getTitle()).isEqualTo("오늘의 절약 리포트");
+        assertThat(notificationCaptor.getValue().getMessage()).contains("12,300원");
+        assertThat(notificationCaptor.getValue().getLinkUrl()).isEqualTo("/reports/monthly");
+
+        verify(notificationSseService).publishNotification(eq(1L), any());
+    }
+
+    @Test
+    void createDailySavedSummaryNotificationsSkipsWhenDuplicatedInSameDay() {
+        LocalDate targetDate = LocalDate.of(2026, 5, 23);
+        when(productWishRepository.summarizeDailySavedAmountByUser(
+                eq(WishStatus.EXPIRED),
+                eq(targetDate.atStartOfDay()),
+                eq(targetDate.plusDays(1).atStartOfDay())
+        )).thenReturn(List.of(dailySavedAmountSummary(1L, 5000L, 20L)));
+        when(notificationRepository.existsByUser_IdAndNotificationTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                1L,
+                NotificationType.DAILY_SAVED_SUMMARY,
+                targetDate.atStartOfDay(),
+                targetDate.plusDays(1).atStartOfDay()
+        )).thenReturn(true);
+
+        NotificationService.DailySavedSummaryResult result =
+                notificationService.createDailySavedSummaryNotifications(targetDate);
+
+        assertThat(result.scannedCount()).isEqualTo(1);
+        assertThat(result.createdCount()).isEqualTo(0);
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(notificationSseService, never()).publishNotification(any(), any());
+    }
+
     private Notification createNotification(Long userId, Long wishId) {
         Notification notification = new Notification();
         notification.setNotificationType(NotificationType.PRICE_DROP_LOWEST);
@@ -157,5 +231,28 @@ class NotificationServiceTest {
         wish.setProductName(productName);
         wish.setProductUrl("https://example.com/" + wishId);
         return wish;
+    }
+
+    private ProductWishRepository.DailySavedAmountSummary dailySavedAmountSummary(
+            Long userId,
+            Long totalSavedAmount,
+            Long representativeWishId
+    ) {
+        return new ProductWishRepository.DailySavedAmountSummary() {
+            @Override
+            public Long getUserId() {
+                return userId;
+            }
+
+            @Override
+            public Long getTotalSavedAmount() {
+                return totalSavedAmount;
+            }
+
+            @Override
+            public Long getRepresentativeWishId() {
+                return representativeWishId;
+            }
+        };
     }
 }
