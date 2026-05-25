@@ -9,7 +9,7 @@
 - 담당자가 순서대로 꺼내 처리하는 구조
 
 ## 2. 왜 이 프로젝트에 필요해?
-이 프로젝트에서는 `가격 갱신`과 `알림 발송`을 분리하려고 RabbitMQ를 쓴다.
+이 프로젝트에서는 `가격 갱신 작업`과 `알림 발송`을 분리하려고 RabbitMQ를 쓴다.
 
 분리 전:
 - 가격 갱신 중 알림 처리까지 한 번에 하다가 알림 쪽 실패가 전체 흐름에 영향을 줄 수 있음
@@ -35,11 +35,17 @@
 - Routing Key: 메시지 라우팅 규칙 키
 - DLQ(Dead Letter Queue): 처리 실패 메시지를 모아두는 큐
 
-현재 설정:
+현재 설정(알림 파이프라인):
 - Exchange: `wish.notification.exchange` (direct)
 - Queue: `wish.notification.queue`
 - DLQ: `wish.notification.dlq`
 - Routing Key: `wish.notification.price-drop`
+
+현재 설정(가격 갱신 큐 파이프라인):
+- Exchange: `wish.price-refresh.exchange` (direct)
+- Queue: `wish.price-refresh.queue`
+- DLQ: `wish.price-refresh.dlq`
+- Routing Key: `wish.price-refresh.request`
 
 ## 5. RabbitMQ를 켜야 할 때 / 꺼도 될 때
 - 켜기: 실제 알림 파이프라인을 검증하거나 운영 반영할 때
@@ -49,6 +55,7 @@
 
 참고:
 - 비활성화 시에도 앱은 동작한다(알림 큐 파이프라인만 비활성).
+- Kafka는 별도 목적(도메인 이벤트 스트림 표준화)에 사용하며 RabbitMQ를 대체하지 않는다.
 
 ## 6. 보안 관점에서 최소 체크
 - 메시지 payload에 비밀번호/토큰/PII 넣지 않기
