@@ -30,6 +30,7 @@ import io.github.mystagogy.savepocket.wish.entity.WishEventType;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingProduct;
 import io.github.mystagogy.savepocket.wish.external.naver.NaverShoppingSearchClient;
+import io.github.mystagogy.savepocket.wish.events.WishDomainEventPublisher;
 import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import io.github.mystagogy.savepocket.wish.repository.WishEventHistoryRepository;
@@ -69,6 +70,9 @@ class WishServiceTest {
     @Mock
     private NotificationEventPublisher notificationEventPublisher;
 
+    @Mock
+    private WishDomainEventPublisher wishDomainEventPublisher;
+
     private WishService wishService;
 
     @BeforeEach
@@ -80,7 +84,8 @@ class WishServiceTest {
                 userRepository,
                 naverShoppingSearchClient,
                 reportCacheService,
-                notificationEventPublisher
+                notificationEventPublisher,
+                wishDomainEventPublisher
         );
     }
 

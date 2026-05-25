@@ -403,7 +403,33 @@ ON notification (user_id, wish_id, notification_type, created_at DESC);
 - 이벤트명: `notification`
 - 데이터: `NotificationItem` JSON
 
-## 3.7 프론트엔드 연동 메모 (Next.js)
+## 3.7 Kafka 이벤트 계약 (Wish Domain Events)
+- Topic: `wish.events.v1`
+- Producer: `WishService`
+- 발행 시점: 트랜잭션 `afterCommit`
+- Key: `wishId` (없으면 `eventId`)
+- 활성화 조건: `WISH_EVENTS_KAFKA_ENABLED=true`
+
+이벤트 스키마:
+```json
+{
+  "eventId": "UUID 문자열",
+  "eventType": "WISH_CREATED | PRICE_CHANGED | WISH_EXPIRED | WISH_PURCHASED | WISH_DELETED | WISH_REACTIVATED",
+  "schemaVersion": 1,
+  "occurredAt": "2026-05-25T15:00:00",
+  "wishId": 10,
+  "userId": 1,
+  "status": "WAITING",
+  "previousReferencePrice": 5610,
+  "currentReferencePrice": 4610
+}
+```
+
+참고:
+- 현재는 Consumer를 두지 않고 Producer만 운영한다.
+- `schemaVersion`은 이벤트 계약 버전이며, 포맷 변경 시 증가시킨다.
+
+## 3.8 프론트엔드 연동 메모 (Next.js)
 - 프론트 프로젝트 경로: `my-webapp`
 - UI 주요 경로
   - `/` : 로그인 메인 화면
@@ -417,7 +443,7 @@ ON notification (user_id, wish_id, notification_type, created_at DESC);
 
 ## 4. 스케줄러 설계
 - 만료 판정: `${WISH_EXPIRATION_CRON:0 */10 * * * *}`
-- 가격 갱신: `${WISH_PRICE_REFRESH_CRON:0 0 * * * *}`
+- 가격 갱신: `${WISH_PRICE_REFRESH_CRON:0 0 0,12 * * *}`
 - 일일 절약 합산 알림: `${NOTIFICATION_DAILY_SAVINGS_CRON:0 0 22 * * *}`
 - 대상 조회
   - 만료: `status='WAITING' AND expire_at <= now`

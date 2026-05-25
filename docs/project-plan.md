@@ -41,7 +41,7 @@
 - 삭제 시 `DELETED` (소프트 삭제 성격)
 
 ### 5.5 가격 추적
-- 1시간 주기로 가격 재조회(환경변수로 주기 조정 가능)
+- 기본 12시간(0시/12시) 주기로 가격 재조회(환경변수로 주기 조정 가능)
 - `trackedProductId` 일치 상품만 반영해 오탐 방지
 - 변동 시 `price_history` + `PRICE_CHANGED` 이벤트 저장
 
@@ -89,7 +89,7 @@
 ## 9. 스케줄 정책
 - 시간대: `Asia/Seoul`
 - 만료 판정 스케줄: 기본 10분 주기 (`WISH_EXPIRATION_CRON`)
-- 가격 갱신 스케줄: 기본 1시간 주기 (`WISH_PRICE_REFRESH_CRON`)
+- 가격 갱신 스케줄: 기본 12시간 주기 (`WISH_PRICE_REFRESH_CRON`)
 - 실패 처리: 상품 단위 실패 격리, 전체 배치 중단 방지
 
 ## 10. 기술 스택
@@ -99,13 +99,16 @@
   - Spring Scheduler
   - Spring Data JPA
   - MySQL
+  - Redis
+  - RabbitMQ
+  - Kafka
   - Swagger/OpenAPI
 - 프론트엔드
   - Next.js 16 (App Router)
   - React 19
   - TypeScript
   - Tailwind CSS 4
-- (확장 후보) Redis, 알림, 소셜 로그인
+- (확장 후보) 소셜 로그인
 
 ## 11. API 초안
 ### 인증
@@ -130,3 +133,9 @@
 - 만료/재활성화/가격변동 이벤트 이력이 누락 없이 저장
 - 절약 금액이 월 리포트에서 일관되게 집계
 - 수동 가격 폴백으로 실사용 상황(SNS 공구 등)을 반영 가능
+
+## 13. 비동기 이벤트 아키텍처(적용 현황)
+- P1 완료: RabbitMQ + SSE 알림 파이프라인
+- P2 완료: 가격 갱신 작업 RabbitMQ 큐 분리
+- P3 진행: 위시 도메인 이벤트 Kafka 발행(Producer 우선)
+- P4 예정: Kafka Consumer 기반 분석/통계 파이프라인 분리

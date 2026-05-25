@@ -23,6 +23,9 @@ import io.github.mystagogy.savepocket.wish.entity.ProductWish;
 import io.github.mystagogy.savepocket.wish.entity.WishEventHistory;
 import io.github.mystagogy.savepocket.wish.entity.WishEventType;
 import io.github.mystagogy.savepocket.wish.entity.WishStatus;
+import io.github.mystagogy.savepocket.wish.events.WishDomainEvent;
+import io.github.mystagogy.savepocket.wish.events.WishDomainEventPublisher;
+import io.github.mystagogy.savepocket.wish.events.WishDomainEventType;
 import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import io.github.mystagogy.savepocket.wish.repository.WishEventHistoryRepository;
@@ -36,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -44,6 +48,7 @@ import org.springframework.util.StringUtils;
 public class WishService {
 
     private static final long EXPIRE_HOURS = 72L;
+    private static final int WISH_EVENT_SCHEMA_VERSION = 1;
     private static final List<String> TRACKED_PRODUCT_ID_QUERY_KEYS = List.of("id", "nvMid", "productNo");
 
     private final ProductWishRepository productWishRepository;
@@ -53,6 +58,7 @@ public class WishService {
     private final NaverShoppingSearchClient naverShoppingSearchClient;
     private final ReportCacheService reportCacheService;
     private final NotificationEventPublisher notificationEventPublisher;
+    private final WishDomainEventPublisher wishDomainEventPublisher;
 
     public WishService(
             ProductWishRepository productWishRepository,
@@ -61,7 +67,8 @@ public class WishService {
             UserRepository userRepository,
             NaverShoppingSearchClient naverShoppingSearchClient,
             ReportCacheService reportCacheService,
-            NotificationEventPublisher notificationEventPublisher
+            NotificationEventPublisher notificationEventPublisher,
+            WishDomainEventPublisher wishDomainEventPublisher
     ) {
         this.productWishRepository = productWishRepository;
         this.wishEventHistoryRepository = wishEventHistoryRepository;
@@ -70,6 +77,7 @@ public class WishService {
         this.naverShoppingSearchClient = naverShoppingSearchClient;
         this.reportCacheService = reportCacheService;
         this.notificationEventPublisher = notificationEventPublisher;
+        this.wishDomainEventPublisher = wishDomainEventPublisher;
     }
 
     @Transactional
@@ -102,6 +110,13 @@ public class WishService {
         event.setEventType(WishEventType.REGISTERED);
         event.setEventAt(now);
         wishEventHistoryRepository.save(event);
+        publishWishDomainEvent(
+                WishDomainEventType.WISH_CREATED,
+                savedWish,
+                now,
+                null,
+                savedWish.getReferencePrice()
+        );
 
         return new WishCreateResponse(
                 savedWish.getId(),
@@ -190,6 +205,13 @@ public class WishService {
         wish.setStatus(WishStatus.PURCHASED);
         appendEvent(wish, WishEventType.PURCHASED, now);
         productWishRepository.flush();
+        publishWishDomainEvent(
+                WishDomainEventType.WISH_PURCHASED,
+                wish,
+                now,
+                null,
+                wish.getReferencePrice()
+        );
         evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
@@ -204,6 +226,13 @@ public class WishService {
         wish.setStatus(WishStatus.DELETED);
         appendEvent(wish, WishEventType.DELETED, now);
         productWishRepository.flush();
+        publishWishDomainEvent(
+                WishDomainEventType.WISH_DELETED,
+                wish,
+                now,
+                null,
+                wish.getReferencePrice()
+        );
         evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
     }
@@ -224,6 +253,13 @@ public class WishService {
         wish.setReactivatedCount(wish.getReactivatedCount() + 1);
         appendEvent(wish, WishEventType.REACTIVATED, now);
         productWishRepository.flush();
+        publishWishDomainEvent(
+                WishDomainEventType.WISH_REACTIVATED,
+                wish,
+                now,
+                null,
+                wish.getReferencePrice()
+        );
         evictMonthlySavingsCache(userId, resolveCurrentUpdatedAt(wish, now), previousUpdatedAt, previousExpiredAt);
 
         return new WishStatusUpdateResponse(wish.getId(), wish.getStatus());
@@ -243,6 +279,13 @@ public class WishService {
             wish.setExpiredAt(targetTime);
             wish.setSavedAmount(wish.effectivePrice());
             appendEvent(wish, WishEventType.EXPIRED, targetTime);
+            publishWishDomainEvent(
+                    WishDomainEventType.WISH_EXPIRED,
+                    wish,
+                    targetTime,
+                    null,
+                    wish.getReferencePrice()
+            );
             evictTargets.add(new UserMonthCacheKey(wish.getUser().getId(), YearMonth.from(targetTime)));
         }
 
@@ -574,7 +617,39 @@ public class WishService {
             ));
         }
 
+        publishWishDomainEvent(
+                WishDomainEventType.PRICE_CHANGED,
+                wish,
+                targetTime,
+                previousReferencePrice,
+                latestLowestPrice
+        );
+
         return RefreshOutcome.UPDATED;
+    }
+
+    private void publishWishDomainEvent(
+            WishDomainEventType eventType,
+            ProductWish wish,
+            LocalDateTime occurredAt,
+            Long previousReferencePrice,
+            Long currentReferencePrice
+    ) {
+        if (wish.getId() == null || wish.getUser() == null || wish.getUser().getId() == null) {
+            return;
+        }
+
+        wishDomainEventPublisher.publishAfterCommit(new WishDomainEvent(
+                UUID.randomUUID().toString(),
+                eventType,
+                WISH_EVENT_SCHEMA_VERSION,
+                occurredAt,
+                wish.getId(),
+                wish.getUser().getId(),
+                wish.getStatus().name(),
+                previousReferencePrice,
+                currentReferencePrice
+        ));
     }
 
     private record UserMonthCacheKey(Long userId, YearMonth yearMonth) {

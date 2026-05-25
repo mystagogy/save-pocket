@@ -43,6 +43,13 @@
 2. 다시 `Add Service` -> `Database` -> `Redis`
 3. 생성 후 각 서비스의 접속 정보(호스트/포트/유저/비밀번호) 확인
 
+### 2-1-1. Kafka 사용 시 추가 준비(P3 선택)
+
+Kafka 이벤트 발행을 운영에서 켜려면 Kafka 브로커가 필요합니다.
+
+- Kafka 미구성: `WISH_EVENTS_KAFKA_ENABLED=false` 유지
+- Kafka 구성: 관리형 Kafka(Confluent/Upstash 등) 또는 별도 브로커 서비스 준비
+
 ### 2-2. 백엔드 환경변수 설정
 
 `save-pocket/src/main/resources/application.properties` 기준으로 아래 변수를 Railway API 서비스에 설정합니다.
@@ -56,6 +63,9 @@
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `NAVER_SHOPPING_API_PATH` (기본 `/v1/search/shop.json`)
+- `WISH_EVENTS_KAFKA_ENABLED` (기본 `false`)
+- `WISH_EVENTS_KAFKA_TOPIC` (기본 `wish.events.v1`)
+- `KAFKA_BOOTSTRAP_SERVERS` (`host:port` 형태)
 
 중요:
 - 값에 따옴표(`"`)를 넣지 않습니다.
@@ -66,6 +76,9 @@
 - `jdbc:mysql://${{MySQL.MYSQLHOST}}:${{MySQL.MYSQLPORT}}/${{MySQL.MYSQLDATABASE}}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul`
 
 설정 후 재배포합니다.
+
+Kafka를 아직 도입하지 않았다면:
+- `WISH_EVENTS_KAFKA_ENABLED=false`로 유지합니다.
 
 ## 3. 프론트(Vercel) 배포
 

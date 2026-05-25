@@ -36,6 +36,7 @@
   - MySQL
   - Redis (세션 저장소)
   - RabbitMQ (알림 이벤트 큐)
+  - Kafka (위시 도메인 이벤트 스트림)
   - Swagger/OpenAPI
 - 프론트엔드
   - Next.js 16 (App Router)
@@ -63,10 +64,13 @@ docker compose up -d
 - `NOTIFICATION_DAILY_SAVINGS_ENABLED` (기본: `true`)
 - `NOTIFICATION_DAILY_SAVINGS_CRON` (기본: `0 0 22 * * *`)
 - `WISH_PRICE_REFRESH_RABBITMQ_ENABLED` (기본: `false`)
+- `KAFKA_BOOTSTRAP_SERVERS` (기본: `localhost:9092`)
+- `WISH_EVENTS_KAFKA_ENABLED` (기본: `false`)
+- `WISH_EVENTS_KAFKA_TOPIC` (기본: `wish.events.v1`)
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `WISH_EXPIRATION_CRON` (기본: `0 */10 * * * *`)
-- `WISH_PRICE_REFRESH_CRON` (기본: `0 0 * * * *`)
+- `WISH_PRICE_REFRESH_CRON` (기본: `0 0 0,12 * * *`)
 
 ### 2) 프론트엔드 실행 (`my-webapp`)
 ```bash
@@ -170,6 +174,23 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - RabbitMQ 계정은 기본 `guest` 대신 전용 사용자 계정을 사용합니다.
 - 큐 payload에 비밀번호/토큰/개인식별정보를 포함하지 않습니다.
 
+## Kafka 위시 이벤트 가이드 (P3)
+P3에서는 위시 도메인 변경을 Kafka 이벤트로 발행합니다.
+
+- Topic: `wish.events.v1`
+- Key: `wishId` (없으면 `eventId`)
+- 발행 시점: 트랜잭션 `afterCommit`
+- 기본값: `WISH_EVENTS_KAFKA_ENABLED=false` (명시적으로 켤 때만 발행)
+
+주요 환경변수(`save-pocket/.env`):
+- `KAFKA_BOOTSTRAP_SERVERS` (예: `localhost:9092`)
+- `WISH_EVENTS_KAFKA_ENABLED` (기본 `false`)
+- `WISH_EVENTS_KAFKA_TOPIC` (기본 `wish.events.v1`)
+
+운영 팁:
+- Kafka 브로커가 없으면 `WISH_EVENTS_KAFKA_ENABLED=false`로 유지합니다.
+- 활성화 시 `schemaVersion=1` 기반 이벤트 계약으로 발행됩니다.
+
 ## 가격 갱신 정책
 - 갱신 대상: `WAITING` 상태 위시
 - 매칭 기준: `trackedProductId`가 일치하는 상품만 반영
@@ -183,3 +204,5 @@ docker compose exec redis redis-cli --scan --pattern 'save-pocket:session*'
 - RabbitMQ 기술 설명서(입문): [docs/rabbitmq-basics.md](docs/rabbitmq-basics.md)
 - RabbitMQ 알림 가이드: [docs/rabbitmq-notification-guide.md](docs/rabbitmq-notification-guide.md)
 - RabbitMQ 가격 갱신 큐화 가이드(P2): [docs/rabbitmq-price-refresh-guide.md](docs/rabbitmq-price-refresh-guide.md)
+- Kafka 기술 설명서(입문): [docs/kafka-basics.md](docs/kafka-basics.md)
+- Kafka 위시 이벤트 가이드(P3): [docs/kafka-wish-events-guide.md](docs/kafka-wish-events-guide.md)
