@@ -127,4 +127,39 @@ class WishEventAnalyticsServiceTest {
         verify(monthlyRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(checkpointRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    void aggregateFromExpiredEventUsesEventSnapshotBeforeMutableWishState() {
+        WishEventAnalyticsService service = new WishEventAnalyticsService(
+                dailyRepository,
+                monthlyRepository,
+                checkpointRepository,
+                productWishRepository
+        );
+        WishDomainEvent event = new WishDomainEvent(
+                "evt-expired-snapshot",
+                WishDomainEventType.WISH_EXPIRED,
+                1,
+                LocalDateTime.of(2026, 5, 26, 12, 0),
+                103L,
+                1L,
+                "EXPIRED",
+                null,
+                12000L
+        );
+
+        ProductWish wish = new ProductWish();
+        wish.setReferencePrice(30000L);
+
+        when(checkpointRepository.existsById("evt-expired-snapshot")).thenReturn(false);
+        when(productWishRepository.findById(103L)).thenReturn(Optional.of(wish));
+        when(dailyRepository.findByUserIdAndStatDate(1L, LocalDate.of(2026, 5, 26))).thenReturn(Optional.empty());
+        when(monthlyRepository.findByUserIdAndStatYearAndStatMonth(1L, 2026, 5)).thenReturn(Optional.empty());
+
+        service.aggregateFromEvent(event);
+
+        ArgumentCaptor<WishEventAnalyticsDaily> dailyCaptor = ArgumentCaptor.forClass(WishEventAnalyticsDaily.class);
+        verify(dailyRepository).save(dailyCaptor.capture());
+        assertThat(dailyCaptor.getValue().getExpiredAmount()).isEqualTo(12000L);
+    }
 }

@@ -104,10 +104,10 @@ public class WishEventAnalyticsService {
         if (event.eventType() == WishDomainEventType.WISH_EXPIRED) {
             Long base = wish.getSavedAmount();
             if (base == null) {
-                base = wish.effectivePrice();
+                base = event.currentReferencePrice();
             }
             if (base == null) {
-                base = event.currentReferencePrice();
+                base = wish.effectivePrice();
             }
             resolved = base != null ? base : 0L;
         } else {
