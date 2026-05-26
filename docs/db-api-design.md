@@ -103,6 +103,42 @@
 | created_at | DATETIME | NOT NULL | 생성시각 |
 | updated_at | DATETIME | NOT NULL | 수정시각 |
 
+### wish_event_analytics_daily
+| 컬럼명 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, AI | 집계 ID |
+| user_id | BIGINT | NOT NULL | 사용자 ID |
+| stat_date | DATE | NOT NULL | 집계 일자 |
+| expired_count | INT | NOT NULL, DEFAULT 0 | 만료 이벤트 건수 |
+| purchased_count | INT | NOT NULL, DEFAULT 0 | 구매 이벤트 건수 |
+| expired_amount | BIGINT | NOT NULL, DEFAULT 0 | 만료 금액 합계 |
+| purchased_amount | BIGINT | NOT NULL, DEFAULT 0 | 구매 금액 합계 |
+| net_amount | BIGINT | NOT NULL, DEFAULT 0 | 순절약(`expired-purchased`) |
+| created_at | DATETIME | NOT NULL | 생성시각 |
+| updated_at | DATETIME | NOT NULL | 수정시각 |
+
+### wish_event_analytics_monthly
+| 컬럼명 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, AI | 집계 ID |
+| user_id | BIGINT | NOT NULL | 사용자 ID |
+| stat_year | INT | NOT NULL | 집계 연도 |
+| stat_month | TINYINT | NOT NULL | 집계 월(1-12) |
+| expired_count | INT | NOT NULL, DEFAULT 0 | 만료 이벤트 건수 |
+| purchased_count | INT | NOT NULL, DEFAULT 0 | 구매 이벤트 건수 |
+| expired_amount | BIGINT | NOT NULL, DEFAULT 0 | 만료 금액 합계 |
+| purchased_amount | BIGINT | NOT NULL, DEFAULT 0 | 구매 금액 합계 |
+| net_amount | BIGINT | NOT NULL, DEFAULT 0 | 순절약(`expired-purchased`) |
+| created_at | DATETIME | NOT NULL | 생성시각 |
+| updated_at | DATETIME | NOT NULL | 수정시각 |
+
+### wish_event_analytics_checkpoint
+| 컬럼명 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| event_id | VARCHAR(100) | PK | 처리 완료 이벤트 ID |
+| event_type | VARCHAR(50) | NOT NULL | 이벤트 타입 |
+| processed_at | DATETIME | NOT NULL | 처리 시각 |
+
 ## 2.3 인덱스 설계
 ```sql
 CREATE UNIQUE INDEX ux_users_email ON users (email);
@@ -136,6 +172,18 @@ ON notification (user_id, is_read, created_at DESC);
 
 CREATE INDEX idx_notification_dedup
 ON notification (user_id, wish_id, notification_type, created_at DESC);
+
+CREATE UNIQUE INDEX ux_wish_event_analytics_daily_user_date
+ON wish_event_analytics_daily (user_id, stat_date);
+
+CREATE UNIQUE INDEX ux_wish_event_analytics_monthly_user_year_month
+ON wish_event_analytics_monthly (user_id, stat_year, stat_month);
+
+CREATE INDEX idx_wish_event_analytics_daily_user_date
+ON wish_event_analytics_daily (user_id, stat_date);
+
+CREATE INDEX idx_wish_event_analytics_monthly_user_year_month
+ON wish_event_analytics_monthly (user_id, stat_year, stat_month);
 ```
 
 ## 2.4 상태 전이 규칙

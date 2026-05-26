@@ -65,6 +65,8 @@ Kafka 이벤트 발행을 운영에서 켜려면 Kafka 브로커가 필요합니
 - `NAVER_SHOPPING_API_PATH` (기본 `/v1/search/shop.json`)
 - `WISH_EVENTS_KAFKA_ENABLED` (기본 `false`)
 - `WISH_EVENTS_KAFKA_TOPIC` (기본 `wish.events.v1`)
+- `WISH_EVENTS_KAFKA_CONSUMER_ENABLED` (기본 `false`)
+- `WISH_EVENTS_KAFKA_CONSUMER_GROUP_ID` (기본 `save-pocket-analytics-v1`)
 - `KAFKA_BOOTSTRAP_SERVERS` (`host:port` 형태)
 
 중요:

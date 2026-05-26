@@ -67,6 +67,8 @@ docker compose up -d
 - `KAFKA_BOOTSTRAP_SERVERS` (기본: `localhost:9092`)
 - `WISH_EVENTS_KAFKA_ENABLED` (기본: `false`)
 - `WISH_EVENTS_KAFKA_TOPIC` (기본: `wish.events.v1`)
+- `WISH_EVENTS_KAFKA_CONSUMER_ENABLED` (기본: `false`)
+- `WISH_EVENTS_KAFKA_CONSUMER_GROUP_ID` (기본: `save-pocket-analytics-v1`)
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `WISH_EXPIRATION_CRON` (기본: `0 */10 * * * *`)
@@ -190,6 +192,7 @@ P3에서는 위시 도메인 변경을 Kafka 이벤트로 발행합니다.
 운영 팁:
 - Kafka 브로커가 없으면 `WISH_EVENTS_KAFKA_ENABLED=false`로 유지합니다.
 - 활성화 시 `schemaVersion=1` 기반 이벤트 계약으로 발행됩니다.
+- 통계 컨슈머를 사용할 때만 `WISH_EVENTS_KAFKA_CONSUMER_ENABLED=true`로 켭니다.
 
 ## 가격 갱신 정책
 - 갱신 대상: `WAITING` 상태 위시
@@ -206,3 +209,5 @@ P3에서는 위시 도메인 변경을 Kafka 이벤트로 발행합니다.
 - RabbitMQ 가격 갱신 큐화 가이드(P2): [docs/rabbitmq-price-refresh-guide.md](docs/rabbitmq-price-refresh-guide.md)
 - Kafka 기술 설명서(입문): [docs/kafka-basics.md](docs/kafka-basics.md)
 - Kafka 위시 이벤트 가이드(P3): [docs/kafka-wish-events-guide.md](docs/kafka-wish-events-guide.md)
+- Kafka P3.5 안정화 가이드: [docs/kafka-p35-stability-guide.md](docs/kafka-p35-stability-guide.md)
+- Kafka Analytics Consumer 가이드(P4): [docs/kafka-analytics-consumer-guide.md](docs/kafka-analytics-consumer-guide.md)
