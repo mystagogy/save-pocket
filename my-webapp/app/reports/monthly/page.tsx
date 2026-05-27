@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ApiRequestError, getMonthlySavings } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { MonthlySavingsResponse } from "@/lib/types";
@@ -17,10 +18,46 @@ function formatSignedCurrency(value: number): string {
   return absolute;
 }
 
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
 export default function MonthlyReportPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  const queryYearParam = parsePositiveInteger(searchParams.get("year"));
+  const queryMonthParam = parsePositiveInteger(searchParams.get("month"));
+  const hasValidQuery = queryYearParam !== null && queryMonthParam !== null && queryMonthParam <= 12;
+  const initialYear = hasValidQuery ? queryYearParam : currentYear;
+  const initialMonth = hasValidQuery ? queryMonthParam : currentMonth;
+
   const [summary, setSummary] = useState<MonthlySavingsResponse | null>(null);
+  const [selectedYear, setSelectedYear] = useState(initialYear);
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+  const [queryYear, setQueryYear] = useState(initialYear);
+  const [queryMonth, setQueryMonth] = useState(initialMonth);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const yearOptions = useMemo(() => {
+    const years = Array.from({ length: 7 }, (_, index) => currentYear - index);
+    if (!years.includes(selectedYear)) {
+      years.push(selectedYear);
+    }
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [currentYear, selectedYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +67,7 @@ export default function MonthlyReportPage() {
       setError(null);
 
       try {
-        const response = await getMonthlySavings();
+        const response = await getMonthlySavings({ year: queryYear, month: queryMonth });
         if (!cancelled) {
           setSummary(response);
         }
@@ -54,7 +91,18 @@ export default function MonthlyReportPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [queryYear, queryMonth]);
+
+  const handlePeriodSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params = new URLSearchParams({
+      year: String(selectedYear),
+      month: String(selectedMonth),
+    });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setQueryYear(selectedYear);
+    setQueryMonth(selectedMonth);
+  };
 
   const detailsForDisplay =
     summary && summary.details && summary.details.length > 0
@@ -151,9 +199,46 @@ export default function MonthlyReportPage() {
       </header>
 
       <section className="mt-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <form onSubmit={handlePeriodSearch}>
+            <label htmlFor="monthly-report-year" className="text-sm font-medium text-[#1f2a44]">
+              연/월 조회
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <select
+                id="monthly-report-year"
+                value={selectedYear}
+                onChange={(event) => setSelectedYear(Number(event.target.value))}
+                className="h-9 rounded-lg border border-[#bfcbec] bg-white px-2 text-sm text-[#1f2a44]"
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}년
+                  </option>
+                ))}
+              </select>
+              <select
+                id="monthly-report-month"
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(Number(event.target.value))}
+                className="h-9 rounded-lg border border-[#bfcbec] bg-white px-2 text-sm text-[#1f2a44]"
+              >
+                {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                  <option key={month} value={month}>
+                    {month}월
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center rounded-lg border border-[#bfcbec] bg-[#f4f7ff] px-3 text-sm font-medium text-[#1f2a44] transition hover:bg-[#e9efff]"
+              >
+                조회
+              </button>
+            </div>
+          </form>
           <div className="text-right">
-            <h2 className="text-xl font-semibold">이번 달 절약 리포트</h2>
+            <h2 className="text-xl font-semibold">월간 절약 리포트</h2>
             <p className="mt-1 text-sm text-[#4b556d]">
               {summary ? `${summary.year}년 ${summary.month}월 기준` : "집계 기준 확인 중"}
             </p>
@@ -168,7 +253,7 @@ export default function MonthlyReportPage() {
           ) : (
             <>
               <div className="mt-5 rounded-2xl bg-[#f8fafc] px-5 py-6 ring-1 ring-black/5">
-                <p className="text-sm text-[#4b556d]">이번 달 총합</p>
+                <p className="text-sm text-[#4b556d]">선택한 달 총합</p>
                 <p
                   className={`mt-2 text-4xl font-bold tracking-tight ${
                     (summary?.netSavedAmount ?? 0) > 0
@@ -231,7 +316,7 @@ export default function MonthlyReportPage() {
                   </ul>
                 ) : (
                   <p className="mt-3 rounded-xl bg-[#f4f7ff] px-3 py-2 text-sm text-[#4b556d]">
-                    이번 달 상세 내역이 없습니다.
+                    선택한 달 상세 내역이 없습니다.
                   </p>
                 )}
               </section>

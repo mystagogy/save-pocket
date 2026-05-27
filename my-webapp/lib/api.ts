@@ -207,8 +207,22 @@ export function deleteWish(id: number) {
   });
 }
 
-export function getMonthlySavings(options?: { redirectOnUnauthorized?: boolean }) {
-  return request<MonthlySavingsResponse>("/reports/monthly", options);
+interface MonthlySavingsRequestOptions {
+  year?: number;
+  month?: number;
+  redirectOnUnauthorized?: boolean;
+}
+
+export function getMonthlySavings(options: MonthlySavingsRequestOptions = {}) {
+  const { year, month, ...requestOptions } = options;
+  const params = new URLSearchParams();
+  if (year !== undefined && month !== undefined) {
+    params.set("year", String(year));
+    params.set("month", String(month));
+  }
+  const query = params.toString();
+  const path = query ? `/reports/monthly?${query}` : "/reports/monthly";
+  return request<MonthlySavingsResponse>(path, requestOptions);
 }
 
 export function getNotifications(limit = 20) {

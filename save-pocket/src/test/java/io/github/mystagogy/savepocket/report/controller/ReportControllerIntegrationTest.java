@@ -14,6 +14,7 @@ import io.github.mystagogy.savepocket.wish.entity.WishStatus;
 import io.github.mystagogy.savepocket.wish.repository.PriceHistoryRepository;
 import io.github.mystagogy.savepocket.wish.repository.ProductWishRepository;
 import io.github.mystagogy.savepocket.wish.repository.WishEventHistoryRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -122,6 +123,30 @@ class ReportControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.netSavedAmount").value(0));
     }
 
+    @Test
+    void getMonthlyReportReturnsRequestedMonthData() throws Exception {
+        LocalDate now = LocalDate.now();
+        LocalDate targetMonth = now.minusMonths(1);
+
+        saveExpiredWishAt(user1, "지난달 만료", 51000L, targetMonth.withDayOfMonth(15).atTime(15, 30));
+        saveExpiredWishAt(user1, "이번달 만료", 23000L, now.withDayOfMonth(10).atTime(10, 0));
+
+        org.springframework.mock.web.MockHttpSession session = loginSession("report-user1@example.com", "Password123!");
+
+        mockMvc.perform(get("/reports/monthly")
+                        .param("year", String.valueOf(targetMonth.getYear()))
+                        .param("month", String.valueOf(targetMonth.getMonthValue()))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.year").value(targetMonth.getYear()))
+                .andExpect(jsonPath("$.data.month").value(targetMonth.getMonthValue()))
+                .andExpect(jsonPath("$.data.expiredAmount").value(51000))
+                .andExpect(jsonPath("$.data.purchasedAmount").value(0))
+                .andExpect(jsonPath("$.data.netSavedAmount").value(51000))
+                .andExpect(jsonPath("$.data.details.length()").value(1))
+                .andExpect(jsonPath("$.data.details[0].wishName").value("지난달 만료"));
+    }
+
     private org.springframework.mock.web.MockHttpSession loginSession(String email, String password) throws Exception {
         String loginRequest = objectMapper.writeValueAsString(Map.of("email", email, "password", password));
 
@@ -135,15 +160,19 @@ class ReportControllerIntegrationTest {
     }
 
     private void saveExpiredWish(User owner, String productName, long savedAmount) {
+        saveExpiredWishAt(owner, productName, savedAmount, LocalDateTime.now().minusHours(2));
+    }
+
+    private void saveExpiredWishAt(User owner, String productName, long savedAmount, LocalDateTime expiredAt) {
         ProductWish wish = new ProductWish();
         wish.setUser(owner);
         wish.setProductName(productName);
         wish.setProductUrl("https://example.com/" + productName.hashCode());
         wish.setStatus(WishStatus.EXPIRED);
-        wish.setFirstRegisteredAt(LocalDateTime.now().minusDays(3));
-        wish.setLastViewedAt(LocalDateTime.now().minusDays(3));
-        wish.setExpireAt(LocalDateTime.now().minusDays(1));
-        wish.setExpiredAt(LocalDateTime.now().minusHours(2));
+        wish.setFirstRegisteredAt(expiredAt.minusDays(3));
+        wish.setLastViewedAt(expiredAt.minusDays(2));
+        wish.setExpireAt(expiredAt.minusDays(1));
+        wish.setExpiredAt(expiredAt);
         wish.setReactivatedCount(0);
         wish.setReferencePrice(savedAmount);
         wish.setSavedAmount(savedAmount);
