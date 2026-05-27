@@ -199,14 +199,12 @@ export default function MonthlyReportPageClient() {
       </header>
 
       <section className="mt-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-center justify-between gap-3">
           <form onSubmit={handlePeriodSearch}>
-            <label htmlFor="monthly-report-year" className="text-sm font-medium text-[#1f2a44]">
-              연/월 조회
-            </label>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <select
                 id="monthly-report-year"
+                aria-label="조회 연도"
                 value={selectedYear}
                 onChange={(event) => setSelectedYear(Number(event.target.value))}
                 className="h-9 rounded-lg border border-[#bfcbec] bg-white px-2 text-sm text-[#1f2a44]"
@@ -219,6 +217,7 @@ export default function MonthlyReportPageClient() {
               </select>
               <select
                 id="monthly-report-month"
+                aria-label="조회 월"
                 value={selectedMonth}
                 onChange={(event) => setSelectedMonth(Number(event.target.value))}
                 className="h-9 rounded-lg border border-[#bfcbec] bg-white px-2 text-sm text-[#1f2a44]"
@@ -240,7 +239,7 @@ export default function MonthlyReportPageClient() {
           <div className="text-right">
             <h2 className="text-xl font-semibold">월간 절약 리포트</h2>
             <p className="mt-1 text-sm text-[#4b556d]">
-              {summary ? `${summary.year}년 ${summary.month}월 기준` : "집계 기준 확인 중"}
+              {summary ? `${summary.year}년 ${summary.month}월` : "집계 확인 중"}
             </p>
           </div>
         </div>
