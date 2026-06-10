@@ -259,6 +259,45 @@ ON wish_event_analytics_monthly (user_id, stat_year, stat_month);
 ### POST /auth/logout
 - Response `204`
 
+### GET /auth/me
+- Response `200`
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "nickname": "절약러"
+}
+```
+
+### PATCH /auth/me/nickname
+- Request
+```json
+{
+  "nickname": "알뜰러"
+}
+```
+- Response `200`
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "nickname": "알뜰러"
+}
+```
+
+### PATCH /auth/me/password
+- Request
+```json
+{
+  "currentPassword": "Password123!",
+  "newPassword": "NewPassword123!"
+}
+```
+- Response `204`
+- Error
+  - `CURRENT_PASSWORD_MISMATCH` (400)
+  - `SAME_PASSWORD_NOT_ALLOWED` (400)
+
 ## 3.3 Wish API
 
 ### POST /wishes
@@ -482,6 +521,7 @@ ON wish_event_analytics_monthly (user_id, stat_year, stat_month);
 - UI 주요 경로
   - `/` : 로그인 메인 화면
   - `/signup` : 회원가입
+  - `/profile` : 계정 정보 조회/수정
   - `/wishes/search` : 위시 상품 검색
   - `/wishes` : 위시 리스트
   - `/wishes/{id}` : 위시 상세
