@@ -1,9 +1,11 @@
 import {
   ApiEnvelope,
   AuthUserResponse,
+  ChangePasswordRequest,
   WishStatus,
   LoginRequest,
   SignupRequest,
+  UpdateNicknameRequest,
   WishCreateRequest,
   WishCreateResponse,
   WishDetailResponse,
@@ -161,6 +163,24 @@ export function logout() {
     method: "POST",
   }).finally(() => {
     clearLoginHint();
+  });
+}
+
+export function getCurrentUser() {
+  return request<AuthUserResponse>("/auth/me");
+}
+
+export function updateNickname(payload: UpdateNicknameRequest) {
+  return request<AuthUserResponse>("/auth/me/nickname", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function changePassword(payload: ChangePasswordRequest) {
+  return request<void>("/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
 

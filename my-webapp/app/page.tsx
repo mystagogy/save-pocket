@@ -106,6 +106,29 @@ export default function HomePage() {
                 <circle cx="4.5" cy="17" r="1.2" fill="currentColor" />
               </svg>
             </Link>
+            <Link
+              href="/profile"
+              prefetch={false}
+              aria-label="내 정보 설정"
+              title="내 정보 설정"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#bfcbec] bg-white text-[#1f2a44] transition hover:bg-[#f4f7ff]"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+                <path
+                  d="M5 19C5.9 15.9 8.5 14.5 12 14.5C15.5 14.5 18.1 15.9 19 19"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Link>
             <NotificationCenter />
             <form action="/logout" method="post">
               <button

@@ -1,6 +1,7 @@
 package io.github.mystagogy.savepocket.auth.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -242,6 +243,99 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    // 로그인된 사용자는 자신의 닉네임을 변경할 수 있어야 한다.
+    @Test
+    void updateNicknameReturns200AndPersistsNewNickname() throws Exception {
+        MvcResult loginResult = login();
+        String requestBody = objectMapper.writeValueAsString(Map.of("nickname", "새닉네임"));
+
+        mockMvc.perform(patch("/auth/me/nickname")
+                        .session((org.springframework.mock.web.MockHttpSession) loginResult.getRequest().getSession(false))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.email").value("user@example.com"))
+                .andExpect(jsonPath("$.data.nickname").value("새닉네임"));
+
+        User updatedUser = userRepository.findByEmail("user@example.com").orElseThrow();
+        Assertions.assertThat(updatedUser.getNickname()).isEqualTo("새닉네임");
+    }
+
+    // 로그인된 사용자는 현재 비밀번호를 확인한 뒤 새 비밀번호로 변경할 수 있어야 한다.
+    @Test
+    void changePasswordReturns204WhenRequestIsValid() throws Exception {
+        MvcResult loginResult = login();
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("currentPassword", "Password123!", "newPassword", "NewPassword123!")
+        );
+
+        mockMvc.perform(patch("/auth/me/password")
+                        .session((org.springframework.mock.web.MockHttpSession) loginResult.getRequest().getSession(false))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNoContent());
+
+        User updatedUser = userRepository.findByEmail("user@example.com").orElseThrow();
+        Assertions.assertThat(passwordEncoder.matches("NewPassword123!", updatedUser.getPasswordHash())).isTrue();
+    }
+
+    // 현재 비밀번호가 틀리면 비밀번호 변경 요청은 400으로 거부되어야 한다.
+    @Test
+    void changePasswordReturns400WhenCurrentPasswordMismatch() throws Exception {
+        MvcResult loginResult = login();
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("currentPassword", "WrongPassword123!", "newPassword", "NewPassword123!")
+        );
+
+        mockMvc.perform(patch("/auth/me/password")
+                        .session((org.springframework.mock.web.MockHttpSession) loginResult.getRequest().getSession(false))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("CURRENT_PASSWORD_MISMATCH"));
+    }
+
+    // 새 비밀번호가 현재 비밀번호와 같으면 비밀번호 변경 요청은 400으로 거부되어야 한다.
+    @Test
+    void changePasswordReturns400WhenNewPasswordMatchesCurrentPassword() throws Exception {
+        MvcResult loginResult = login();
+        String requestBody = objectMapper.writeValueAsString(
+                Map.of("currentPassword", "Password123!", "newPassword", "Password123!")
+        );
+
+        mockMvc.perform(patch("/auth/me/password")
+                        .session((org.springframework.mock.web.MockHttpSession) loginResult.getRequest().getSession(false))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("SAME_PASSWORD_NOT_ALLOWED"));
+    }
+
+    // 인증되지 않은 상태로 회원 정보 수정 API를 호출하면 401을 반환해야 한다.
+    @Test
+    void updateProfileReturns401WhenUnauthenticated() throws Exception {
+        mockMvc.perform(patch("/auth/me/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("nickname", "새닉네임"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    private MvcResult login() throws Exception {
+        String loginRequestBody = objectMapper.writeValueAsString(
+                Map.of("email", "user@example.com", "password", "Password123!")
+        );
+        return mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginRequestBody))
+                .andExpect(status().isOk())
+                .andReturn();
     }
 
     @TestConfiguration

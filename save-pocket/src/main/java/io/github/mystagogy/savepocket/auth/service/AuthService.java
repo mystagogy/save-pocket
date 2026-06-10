@@ -1,8 +1,10 @@
 package io.github.mystagogy.savepocket.auth.service;
 
 import io.github.mystagogy.savepocket.auth.dto.AuthUserResponse;
+import io.github.mystagogy.savepocket.auth.dto.ChangePasswordRequest;
 import io.github.mystagogy.savepocket.auth.dto.LoginRequest;
 import io.github.mystagogy.savepocket.auth.dto.SignupRequest;
+import io.github.mystagogy.savepocket.auth.dto.UpdateNicknameRequest;
 import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.auth.session.AuthSessionConstants;
@@ -16,8 +18,8 @@ import java.util.Locale;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -89,9 +91,30 @@ public class AuthService {
             throw new SavePocketException(ErrorCode.UNAUTHORIZED);
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new SavePocketException(ErrorCode.UNAUTHORIZED));
+        User user = getUserOrThrow(userId);
         return new AuthUserResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+
+    public AuthUserResponse updateNickname(Long userId, UpdateNicknameRequest request) {
+        User user = getUserOrThrow(userId);
+        user.setNickname(request.nickname());
+        User savedUser = userRepository.save(user);
+        return new AuthUserResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname());
+    }
+
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = getUserOrThrow(userId);
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new SavePocketException(ErrorCode.CURRENT_PASSWORD_MISMATCH);
+        }
+
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new SavePocketException(ErrorCode.SAME_PASSWORD_NOT_ALLOWED);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 
     public void logout(HttpServletRequest servletRequest) {
@@ -106,5 +129,10 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new SavePocketException(ErrorCode.UNAUTHORIZED));
     }
 }
