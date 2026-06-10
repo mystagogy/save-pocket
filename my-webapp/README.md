@@ -22,6 +22,7 @@ npm run dev:remote
 ## 주요 페이지
 - `/login` 로그인
 - `/signup` 회원가입
+- `/profile` 계정 정보 조회/수정
 - `/wishes/search` 위시 상품 검색
 - `/wishes/new` 위시 등록
 - `/wishes` 위시 목록

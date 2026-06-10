@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.mystagogy.savepocket.auth.dto.AuthUserResponse;
+import io.github.mystagogy.savepocket.auth.dto.ChangePasswordRequest;
 import io.github.mystagogy.savepocket.auth.dto.LoginRequest;
 import io.github.mystagogy.savepocket.auth.dto.SignupRequest;
+import io.github.mystagogy.savepocket.auth.dto.UpdateNicknameRequest;
 import io.github.mystagogy.savepocket.auth.entity.User;
 import io.github.mystagogy.savepocket.auth.repository.UserRepository;
 import io.github.mystagogy.savepocket.auth.session.AuthSessionConstants;
@@ -191,6 +193,76 @@ class AuthServiceTest {
                 .isInstanceOf(SavePocketException.class)
                 .extracting(ex -> ((SavePocketException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.UNAUTHORIZED);
+    }
+
+    // 로그인 사용자는 닉네임을 변경하고 갱신된 사용자 정보를 받아야 한다.
+    @Test
+    void updateNicknameSuccessReturnsUpdatedUser() {
+        User user = createUser(1L, "user@example.com", "encoded-password", "기존닉네임");
+        UpdateNicknameRequest request = new UpdateNicknameRequest("새닉네임");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        AuthUserResponse response = authService.updateNickname(1L, request);
+
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.email()).isEqualTo("user@example.com");
+        assertThat(response.nickname()).isEqualTo("새닉네임");
+        assertThat(user.getNickname()).isEqualTo("새닉네임");
+    }
+
+    // 현재 비밀번호가 일치하면 비밀번호를 새 값으로 변경해야 한다.
+    @Test
+    void changePasswordSuccessUpdatesPasswordHash() {
+        User user = createUser(1L, "user@example.com", "encoded-current-password", "절약러");
+        ChangePasswordRequest request = new ChangePasswordRequest("Current123!", "NewPassword123!");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Current123!", "encoded-current-password")).thenReturn(true);
+        when(passwordEncoder.matches("NewPassword123!", "encoded-current-password")).thenReturn(false);
+        when(passwordEncoder.encode("NewPassword123!")).thenReturn("encoded-new-password");
+        when(userRepository.save(user)).thenReturn(user);
+
+        authService.changePassword(1L, request);
+
+        assertThat(user.getPasswordHash()).isEqualTo("encoded-new-password");
+        verify(passwordEncoder).encode("NewPassword123!");
+    }
+
+    // 현재 비밀번호가 일치하지 않으면 비밀번호 변경을 거부해야 한다.
+    @Test
+    void changePasswordFailsWhenCurrentPasswordMismatch() {
+        User user = createUser(1L, "user@example.com", "encoded-current-password", "절약러");
+        ChangePasswordRequest request = new ChangePasswordRequest("WrongCurrent123!", "NewPassword123!");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongCurrent123!", "encoded-current-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword(1L, request))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.CURRENT_PASSWORD_MISMATCH);
+
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    // 새 비밀번호가 현재 비밀번호와 같으면 비밀번호 변경을 거부해야 한다.
+    @Test
+    void changePasswordFailsWhenNewPasswordMatchesCurrentPassword() {
+        User user = createUser(1L, "user@example.com", "encoded-current-password", "절약러");
+        ChangePasswordRequest request = new ChangePasswordRequest("Current123!", "Current123!");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Current123!", "encoded-current-password")).thenReturn(true);
+        when(passwordEncoder.matches("Current123!", "encoded-current-password")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changePassword(1L, request))
+                .isInstanceOf(SavePocketException.class)
+                .extracting(ex -> ((SavePocketException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.SAME_PASSWORD_NOT_ALLOWED);
+
+        verify(passwordEncoder, never()).encode(any());
     }
 
     private User createUser(Long id, String email, String passwordHash, String nickname) {

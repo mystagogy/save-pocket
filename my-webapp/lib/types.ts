@@ -31,6 +31,15 @@ export interface SignupRequest {
   nickname: string;
 }
 
+export interface UpdateNicknameRequest {
+  nickname: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface WishCreateRequest {
   productUrl: string;
   trackedProductId?: string;

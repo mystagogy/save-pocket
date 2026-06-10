@@ -1,9 +1,11 @@
 import {
   ApiEnvelope,
   AuthUserResponse,
+  ChangePasswordRequest,
   WishStatus,
   LoginRequest,
   SignupRequest,
+  UpdateNicknameRequest,
   WishCreateRequest,
   WishCreateResponse,
   WishDetailResponse,
@@ -72,7 +74,7 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const envelope = await parseEnvelope<T>(response);
   const unauthorized =
     response.status === 401 || envelope?.error?.code === "UNAUTHORIZED";
-  if (unauthorized && redirectOnUnauthorized && !path.startsWith("/auth/")) {
+  if (unauthorized && redirectOnUnauthorized) {
     handleUnauthorizedRedirect();
   }
 
@@ -132,6 +134,7 @@ export function signup(payload: SignupRequest) {
   return request<AuthUserResponse>("/auth/signup", {
     method: "POST",
     body: JSON.stringify(payload),
+    redirectOnUnauthorized: false,
   });
 }
 
@@ -139,6 +142,7 @@ export function login(payload: LoginRequest) {
   return request<AuthUserResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
+    redirectOnUnauthorized: false,
   }).then(async (response) => {
     try {
       await request<AuthUserResponse>("/auth/me", {
@@ -159,8 +163,27 @@ export function login(payload: LoginRequest) {
 export function logout() {
   return request<void>("/auth/logout", {
     method: "POST",
+    redirectOnUnauthorized: false,
   }).finally(() => {
     clearLoginHint();
+  });
+}
+
+export function getCurrentUser() {
+  return request<AuthUserResponse>("/auth/me");
+}
+
+export function updateNickname(payload: UpdateNicknameRequest) {
+  return request<AuthUserResponse>("/auth/me/nickname", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function changePassword(payload: ChangePasswordRequest) {
+  return request<void>("/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
 
